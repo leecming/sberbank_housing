@@ -7,7 +7,6 @@ on Sberbank Russian Housing Market dataset
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import KFold
-import tensorflow as tf
 from sklearn.ensemble import GradientBoostingRegressor
 from preprocessors import preprocess_csv
 
@@ -27,9 +26,6 @@ def train_fold(fold, train_df, test_df):
     train_idx, val_idx = fold
     train_x = train_df.iloc[train_idx].drop('price_doc', axis=1)
     train_y = train_df.iloc[train_idx]['price_doc']
-
-    val_x = train_df.iloc[val_idx].drop('price_doc', axis=1)
-    val_y = train_df.iloc[val_idx]['price_doc']
 
     gbr = GradientBoostingRegressor()
 
@@ -61,5 +57,5 @@ if __name__ == '__main__':
     print(mean_pred.shape)
 
     pd.DataFrame({'id': raw_test_df['id'],
-                  'price_doc': mean_pred}).to_csv('data/output.csv',
+                  'price_doc': mean_pred}).to_csv('data/gb_regressor_output.csv',
                                                   index=False)
