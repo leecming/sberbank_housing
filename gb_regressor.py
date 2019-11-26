@@ -23,7 +23,7 @@ def split_to_folds(input_df):
 
 
 def train_fold(fold, train_df, test_df):
-    train_idx, val_idx = fold
+    train_idx, _ = fold
     train_x = train_df.iloc[train_idx].drop('price_doc', axis=1)
     train_y = train_df.iloc[train_idx]['price_doc']
 
@@ -40,7 +40,11 @@ if __name__ == '__main__':
     raw_train_df = pd.read_csv(TRAIN_PATH)
     raw_test_df = pd.read_csv(TEST_PATH)
 
-    processed_train_df, processed_test_df = preprocess_csv(raw_train_df, raw_test_df)
+    processed_train_df, processed_test_df = preprocess_csv(raw_train_df,
+                                                           raw_test_df,
+                                                           ohe_features=True,
+                                                           ohe_card=20)
+    print(processed_train_df.shape)
 
     assert raw_train_df.shape[0] == processed_train_df.shape[0]
     assert raw_test_df.shape[0] == processed_test_df.shape[0]
