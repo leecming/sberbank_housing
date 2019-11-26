@@ -3,7 +3,10 @@ Modified version of basic_dense -
 1. StandardScaler on all features
 2. log1p on output
 3. BatchNorm
+4. EMA on model weights
+5. parallel processing using mp where num_cores = num_folds
 """
+import os
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import KFold
@@ -13,9 +16,13 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.keras import layers
 from preprocessors import preprocess_csv
 from keras_util import ExponentialMovingAverage
+from multiprocessing import Pool
 
-SEED = 1337  # seed for kfold split
-NUM_FOLDS = 4  # kfold num splits
+os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
+SEED = 1337  # seed for k-fold split
+NUM_FOLDS = 4  # k-fold num splits
 TRAIN_PATH = 'data/train.csv'
 TEST_PATH = 'data/test.csv'
 BATCH_SIZE = 64
@@ -46,7 +53,7 @@ def build_dense_model():
     return model
 
 
-def train_fold(model, fold, train_df, test_df):
+def train_fold(fold, train_df, test_df):
     train_idx, val_idx = fold
     train_x = train_df.iloc[train_idx].drop('price_doc', axis=1)
     train_y = train_df.iloc[train_idx]['price_doc']
@@ -60,17 +67,19 @@ def train_fold(model, fold, train_df, test_df):
     train_x = std_scaler.transform(train_x)
     val_x = std_scaler.transform(val_x)
 
+    model = build_dense_model()
     results = model.fit(x=train_x,
                         y=train_y,
                         batch_size=BATCH_SIZE,
                         validation_data=(val_x, val_y),
                         epochs=NUM_EPOCHS,
+                        verbose=0,
                         callbacks=[ExponentialMovingAverage()])
 
     test_df = std_scaler.transform(test_df)
     test_pred = np.expm1(model.predict(test_df))
 
-    return model, results.history, test_pred
+    return results.history, test_pred
 
 
 if __name__ == '__main__':
@@ -85,22 +94,16 @@ if __name__ == '__main__':
     folds = split_to_folds(processed_train_df)
     all_fold_results = []
     all_fold_preds = []
-    for curr_fold in folds:
-        _, curr_results, curr_pred = train_fold(build_dense_model(),
-                                                curr_fold,
-                                                processed_train_df,
-                                                processed_test_df)
 
-        all_fold_results.append(curr_results)
-        all_fold_preds.append(curr_pred)
+    with Pool(NUM_FOLDS) as p:
+        combined_results = p.starmap(train_fold, ((curr_fold,
+                                                   processed_train_df,
+                                                   processed_test_df) for curr_fold in folds))
 
-    print('Loss: {}'.format(np.mean([x['loss'] for x in all_fold_results], axis=0)))
-    print('Val loss: {}'.format(np.mean([x['val_loss'] for x in all_fold_results], axis=0)))
-    print('Val RMSLE: {}'.format(np.sqrt(np.mean([x['val_loss'] for x in all_fold_results], axis=0))))
-
-    mean_pred = np.squeeze(np.mean(np.stack(all_fold_preds), axis=0))
-    print(mean_pred.shape)
-
+    print('Loss: {}'.format(np.mean([x[0]['loss'] for x in combined_results], axis=0)))
+    print('Val loss: {}'.format(np.mean([x[0]['val_loss'] for x in combined_results], axis=0)))
+    print('Val RMSLE: {}'.format(np.sqrt(np.mean([x[0]['val_loss'] for x in combined_results], axis=0))))
+    mean_pred = np.squeeze(np.mean(np.stack([x[1] for x in combined_results]), axis=0))
     pd.DataFrame({'id': raw_test_df['id'],
                   'price_doc': mean_pred}).to_csv('data/scaled_dense_output.csv',
                                                   index=False)
