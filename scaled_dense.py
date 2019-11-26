@@ -23,10 +23,8 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 SEED = 1337  # seed for k-fold split
 NUM_FOLDS = 4  # k-fold num splits
-TRAIN_PATH = 'data/train.csv'
-TEST_PATH = 'data/test.csv'
 BATCH_SIZE = 64
-NUM_EPOCHS = 30
+NUM_EPOCHS = 100
 
 
 def split_to_folds(input_df):
@@ -83,13 +81,7 @@ def train_fold(fold, train_df, test_df):
 
 
 if __name__ == '__main__':
-    raw_train_df = pd.read_csv(TRAIN_PATH)
-    raw_test_df = pd.read_csv(TEST_PATH)
-
-    processed_train_df, processed_test_df = preprocess_csv(raw_train_df, raw_test_df)
-
-    assert raw_train_df.shape[0] == processed_train_df.shape[0]
-    assert raw_test_df.shape[0] == processed_test_df.shape[0]
+    train_ids, test_ids, processed_train_df, processed_test_df = preprocess_csv()
 
     folds = split_to_folds(processed_train_df)
     all_fold_results = []
@@ -104,6 +96,6 @@ if __name__ == '__main__':
     print('Val loss: {}'.format(np.mean([x[0]['val_loss'] for x in combined_results], axis=0)))
     print('Val RMSLE: {}'.format(np.sqrt(np.mean([x[0]['val_loss'] for x in combined_results], axis=0))))
     mean_pred = np.squeeze(np.mean(np.stack([x[1] for x in combined_results]), axis=0))
-    pd.DataFrame({'id': raw_test_df['id'],
+    pd.DataFrame({'id': test_ids,
                   'price_doc': mean_pred}).to_csv('data/scaled_dense_output.csv',
                                                   index=False)
