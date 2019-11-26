@@ -11,11 +11,8 @@ from sklearn.ensemble import GradientBoostingRegressor
 from preprocessors import preprocess_csv
 from multiprocessing import Pool
 
-
 SEED = 1337  # seed for kfold split
 NUM_FOLDS = 4  # kfold num splits
-TRAIN_PATH = 'data/train.csv'
-TEST_PATH = 'data/test.csv'
 
 
 def split_to_folds(input_df):
@@ -39,16 +36,8 @@ def train_fold(fold, train_df, test_df):
 
 
 if __name__ == '__main__':
-    raw_train_df = pd.read_csv(TRAIN_PATH)
-    raw_test_df = pd.read_csv(TEST_PATH)
-
-    processed_train_df, processed_test_df = preprocess_csv(raw_train_df,
-                                                           raw_test_df,
-                                                           ohe_features=True,
-                                                           ohe_card=20)
-
-    assert raw_train_df.shape[0] == processed_train_df.shape[0]
-    assert raw_test_df.shape[0] == processed_test_df.shape[0]
+    train_ids, test_ids, processed_train_df, processed_test_df = preprocess_csv(ohe_features=True,
+                                                                                ohe_card=20)
 
     folds = split_to_folds(processed_train_df)
 
@@ -58,6 +47,6 @@ if __name__ == '__main__':
                                                    processed_test_df) for curr_fold in folds))
 
     mean_pred = np.squeeze(np.mean(np.stack([x for x in combined_results]), axis=0))
-    pd.DataFrame({'id': raw_test_df['id'],
+    pd.DataFrame({'id': test_ids,
                   'price_doc': mean_pred}).to_csv('data/gb_regressor_output.csv',
                                                   index=False)

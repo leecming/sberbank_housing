@@ -17,8 +17,6 @@ from preprocessors import preprocess_csv
 
 SEED = 1337  # seed for kfold split
 NUM_FOLDS = 4  # kfold num splits
-TRAIN_PATH = 'data/train.csv'
-TEST_PATH = 'data/test.csv'
 BATCH_SIZE = 64
 NUM_EPOCHS = 5
 
@@ -67,13 +65,7 @@ def train_fold(model, fold, train_df, test_df):
 
 
 if __name__ == '__main__':
-    raw_train_df = pd.read_csv(TRAIN_PATH)
-    raw_test_df = pd.read_csv(TEST_PATH)
-
-    processed_train_df, processed_test_df = preprocess_csv(raw_train_df, raw_test_df)
-
-    assert raw_train_df.shape[0] == processed_train_df.shape[0]
-    assert raw_test_df.shape[0] == processed_test_df.shape[0]
+    train_ids, test_ids, processed_train_df, processed_test_df = preprocess_csv()
 
     folds = split_to_folds(processed_train_df)
     all_fold_results = []
@@ -93,6 +85,6 @@ if __name__ == '__main__':
     mean_pred = np.squeeze(np.mean(np.stack(all_fold_preds), axis=0))
     print(mean_pred.shape)
 
-    pd.DataFrame({'id': raw_test_df['id'],
+    pd.DataFrame({'id': test_ids,
                   'price_doc': mean_pred}).to_csv('data/output.csv',
                                                   index=False)
