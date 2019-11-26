@@ -8,8 +8,9 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import KFold
 from sklearn.preprocessing import StandardScaler
-from tensorflow.python.keras.models import Model
-from tensorflow.python.keras import layers
+from tensorflow.keras.models import Model
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras import layers
 from preprocessors import preprocess_csv
 
 SEED = 1337  # seed for kfold split
@@ -17,7 +18,7 @@ NUM_FOLDS = 4  # kfold num splits
 TRAIN_PATH = 'data/train.csv'
 TEST_PATH = 'data/test.csv'
 BATCH_SIZE = 64
-NUM_EPOCHS = 5
+NUM_EPOCHS = 20
 
 
 def split_to_folds(input_df):
@@ -29,7 +30,8 @@ def split_to_folds(input_df):
 def build_dense_model():
     """ Simple two layer MLP """
     inputs = layers.Input(shape=(277,))
-    output = layers.Dense(64, activation='relu')(inputs)
+    output = layers.GaussianDropout(0.1)(inputs)
+    output = layers.Dense(64, activation='relu')(output)
     output = layers.BatchNormalization()(output)
     output = layers.Dropout(0.1)(output)
     output = layers.Dense(64, activation='relu')(output)
@@ -37,7 +39,8 @@ def build_dense_model():
     output = layers.Dense(1)(output)
     model = Model(inputs=inputs,
                   outputs=output)
-    model.compile(optimizer='adam',
+
+    model.compile(optimizer=Adam(),
                   loss='mean_squared_error')
     return model
 
@@ -89,6 +92,7 @@ if __name__ == '__main__':
         all_fold_results.append(curr_results)
         all_fold_preds.append(curr_pred)
 
+    print('Loss: {}'.format(np.mean([x['loss'] for x in all_fold_results], axis=0)))
     print('Val loss: {}'.format(np.mean([x['val_loss'] for x in all_fold_results], axis=0)))
     print('Val RMSLE: {}'.format(np.sqrt(np.mean([x['val_loss'] for x in all_fold_results], axis=0))))
 
