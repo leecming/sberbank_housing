@@ -2,8 +2,13 @@
 import numpy as np
 import pandas as pd
 
+TRAIN_PATH = 'data/train.csv'
+TEST_PATH = 'data/test.csv'
+MACRO_PATH = 'data/macro.csv'
 
-def preprocess_csv(train_df, test_df, ohe_features=False, ohe_card=10):
+
+def preprocess_csv(ohe_features=False,
+                   ohe_card=10):
     """
     Transforms raw data in input CSVs into features ready for modelling
     1. Drop id column
@@ -11,16 +16,27 @@ def preprocess_csv(train_df, test_df, ohe_features=False, ohe_card=10):
     3. Drop any non-numeric column
     4, if ohe_features, ohe all non-numeric columns + numeric columns w/ distinct < ohe_card
     """
+    train_df = pd.read_csv(TRAIN_PATH)
+    test_df = pd.read_csv(TEST_PATH)
+    macro_df = pd.read_csv(MACRO_PATH)
+
+    macro_columns_interest = [col for col in macro_df.columns if macro_df[col].nunique() > 1000]
+    macro_df = macro_df[macro_columns_interest]
+
     # infer arg needed otherwise int columns get casted as float
-    temp_train_df = train_df.copy().fillna(-1, downcast='infer')
-    temp_train_df['is_train'] = 1
-    temp_test_df = test_df.copy().fillna(-1, downcast='infer')
-    temp_test_df['is_train'] = 0
-    processed_df = temp_train_df.append(temp_test_df,
-                                        ignore_index=True,
-                                        sort=False)
+    train_df = train_df.fillna(-1, downcast='infer')
+    train_df['is_train'] = 1
+
+    test_df = test_df.fillna(-1, downcast='infer')
+    test_df['is_train'] = 0
+
+    processed_df = train_df.append(test_df,
+                                   ignore_index=True,
+                                   sort=False)
 
     # 1. Drop ID col
+    train_ids = processed_df[processed_df['is_train'] == 1]['id'].values
+    test_ids = processed_df[processed_df['is_train'] == 0]['id'].values
     processed_df.drop(['id'], axis=1, inplace=True)
 
     # 2. Split timestamp
@@ -46,4 +62,4 @@ def preprocess_csv(train_df, test_df, ohe_features=False, ohe_card=10):
     processed_test = processed_df[processed_df['is_train'] == 0].drop(['is_train', 'price_doc'],
                                                                       axis=1)
 
-    return processed_train, processed_test
+    return train_ids, test_ids, processed_train, processed_test
