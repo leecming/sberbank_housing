@@ -2,13 +2,15 @@
 Starter sklearn implementation of a Gradient Boosting regression model
 on Sberbank Russian Housing Market dataset
 (https://www.kaggle.com/c/sberbank-russian-housing-market)
-- No pre-processing: just drop all non-numeric columns
+- Uses MP to do parallel processing by folds
 """
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import KFold
 from sklearn.ensemble import GradientBoostingRegressor
 from preprocessors import preprocess_csv
+from multiprocessing import Pool
+
 
 SEED = 1337  # seed for kfold split
 NUM_FOLDS = 4  # kfold num splits
@@ -27,7 +29,7 @@ def train_fold(fold, train_df, test_df):
     train_x = train_df.iloc[train_idx].drop('price_doc', axis=1)
     train_y = train_df.iloc[train_idx]['price_doc']
 
-    gbr = GradientBoostingRegressor()
+    gbr = GradientBoostingRegressor(n_estimators=300)
 
     gbr.fit(train_x,
             train_y)
@@ -44,22 +46,18 @@ if __name__ == '__main__':
                                                            raw_test_df,
                                                            ohe_features=True,
                                                            ohe_card=20)
-    print(processed_train_df.shape)
 
     assert raw_train_df.shape[0] == processed_train_df.shape[0]
     assert raw_test_df.shape[0] == processed_test_df.shape[0]
 
     folds = split_to_folds(processed_train_df)
-    all_fold_preds = []
-    for curr_fold in folds:
-        curr_pred = train_fold(curr_fold,
-                               processed_train_df,
-                               processed_test_df)
-        all_fold_preds.append(curr_pred)
 
-    mean_pred = np.squeeze(np.mean(np.stack(all_fold_preds), axis=0))
-    print(mean_pred.shape)
+    with Pool(NUM_FOLDS) as p:
+        combined_results = p.starmap(train_fold, ((curr_fold,
+                                                   processed_train_df,
+                                                   processed_test_df) for curr_fold in folds))
 
+    mean_pred = np.squeeze(np.mean(np.stack([x for x in combined_results]), axis=0))
     pd.DataFrame({'id': raw_test_df['id'],
                   'price_doc': mean_pred}).to_csv('data/gb_regressor_output.csv',
                                                   index=False)
