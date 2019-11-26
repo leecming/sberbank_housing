@@ -12,13 +12,14 @@ from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras import layers
 from preprocessors import preprocess_csv
+from keras_util import ExponentialMovingAverage
 
 SEED = 1337  # seed for kfold split
 NUM_FOLDS = 4  # kfold num splits
 TRAIN_PATH = 'data/train.csv'
 TEST_PATH = 'data/test.csv'
 BATCH_SIZE = 64
-NUM_EPOCHS = 20
+NUM_EPOCHS = 30
 
 
 def split_to_folds(input_df):
@@ -63,7 +64,8 @@ def train_fold(model, fold, train_df, test_df):
                         y=train_y,
                         batch_size=BATCH_SIZE,
                         validation_data=(val_x, val_y),
-                        epochs=NUM_EPOCHS)
+                        epochs=NUM_EPOCHS,
+                        callbacks=[ExponentialMovingAverage()])
 
     test_df = std_scaler.transform(test_df)
     test_pred = np.expm1(model.predict(test_df))
