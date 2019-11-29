@@ -34,7 +34,7 @@ def generate_macro_windows(min_unique=100, lookback_period=100):
     macro_df[[x for x in macro_df.columns if x != 'timestamp']] = StandardScaler().fit_transform(
         macro_df[[x for x in macro_df.columns if x != 'timestamp']])
 
-    rolling_matrix = window_stack(macro_df, width=100)
+    rolling_matrix = window_stack(macro_df, width=lookback_period)
     rolling_dates = pd.DataFrame(rolling_matrix[:, -1, 0]).reset_index()
     rolling_dates.columns = ['rolling_id', 'timestamp']
 
@@ -46,7 +46,9 @@ def generate_macro_windows(min_unique=100, lookback_period=100):
 
 def preprocess_csv(ohe_features=False,
                    ohe_card=10,
-                   generate_rolling=False):
+                   generate_rolling=False,
+                   min_unique=100,
+                   lookback_period=100):
     """
     Transforms raw data in input CSVs into features ready for modelling
     1. Drop id column
@@ -99,7 +101,8 @@ def preprocess_csv(ohe_features=False,
 
     # Generate lookback data
     if generate_rolling:
-        rolling_dates, rolling_matrix = generate_macro_windows()
+        rolling_dates, rolling_matrix = generate_macro_windows(min_unique=min_unique,
+                                                               lookback_period=lookback_period)
         train_rolling = rolling_matrix[
             processed_train.set_index('timestamp').join(rolling_dates.set_index('timestamp'))['rolling_id'].values]
         test_rolling = rolling_matrix[
