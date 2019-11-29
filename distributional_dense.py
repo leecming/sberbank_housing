@@ -22,7 +22,7 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 SEED = 1337  # seed for k-fold split
-NUM_FOLDS = 4  # k-fold num splits
+NUM_FOLDS = 8  # k-fold num splits
 BATCH_SIZE = 64
 NUM_EPOCHS = 30
 LOW = 11  # lowest training price (log1p) = 11.51
