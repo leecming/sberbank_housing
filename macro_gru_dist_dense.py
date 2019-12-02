@@ -7,6 +7,7 @@ import os
 import time
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 from sklearn.model_selection import KFold
 from sklearn.preprocessing import StandardScaler
 from scipy.stats import truncnorm
@@ -149,8 +150,16 @@ if __name__ == '__main__':
                                                    train_rolling,
                                                    test_rolling) for curr_fold in folds))
 
-    print('Loss: {}'.format(np.mean([x[0]['loss'] for x in combined_results], axis=0)))
-    print('Val loss: {}'.format(np.mean([x[0]['val_loss'] for x in combined_results], axis=0)))
+    losses = np.mean([x[0]['loss'] for x in combined_results], axis=0)
+    val_losses = np.mean([x[0]['val_loss'] for x in combined_results], axis=0)
+    print('Loss: {}'.format(losses))
+    print('Val loss: {}'.format(val_losses))
+    plt.plot(losses, label='train_losses')
+    plt.plot(val_losses, label='val_losses')
+    plt.title('Distributional GRU Dense + macros')
+    plt.legend(loc='best')
+    plt.show()
+
     mean_pred = np.squeeze(np.mean(np.stack([x[1] for x in combined_results]), axis=0))
     pd.DataFrame({'id': test_ids,
                   'price_doc': mean_pred}).to_csv('data/output/macro_gru_dist_dense_output.csv',
