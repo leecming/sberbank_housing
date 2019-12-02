@@ -27,7 +27,9 @@ def train_fold(fold, train_df, test_df):
     train_x = train_df.iloc[train_idx].drop('price_doc', axis=1)
     train_y = train_df.iloc[train_idx]['price_doc']
 
-    xgbr = XGBRegressor(n_estimators=300, objective='reg:squarederror')
+    xgbr = XGBRegressor(n_estimators=300,
+                        n_jobs=8,
+                        objective='reg:squarederror')
 
     xgbr.fit(train_x,
              train_y)

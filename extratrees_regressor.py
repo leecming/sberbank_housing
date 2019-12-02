@@ -27,7 +27,8 @@ def train_fold(fold, train_df, test_df):
     train_x = train_df.iloc[train_idx].drop('price_doc', axis=1)
     train_y = train_df.iloc[train_idx]['price_doc']
 
-    etr = ExtraTreesRegressor(n_estimators=300)
+    etr = ExtraTreesRegressor(n_estimators=300,
+                              n_jobs=8)
 
     etr.fit(train_x,
             train_y)
