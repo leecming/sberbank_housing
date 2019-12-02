@@ -23,12 +23,14 @@ def split_to_folds(input_df):
 
 
 def train_fold(fold, train_df, test_df):
-    print('Here')
     train_idx, _ = fold
     train_x = train_df.iloc[train_idx].drop('price_doc', axis=1)
     train_y = train_df.iloc[train_idx]['price_doc']
 
-    lgbmr = LGBMRegressor(n_estimators=300)
+    lgbmr = LGBMRegressor(n_estimators=1000,
+                          boosting_type='dart',
+                          max_bin=1024,
+                          num_leaves=127)
 
     lgbmr.fit(train_x,
               train_y)
