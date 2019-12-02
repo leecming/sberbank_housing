@@ -134,7 +134,7 @@ if __name__ == '__main__':
     print('Val loss: {}'.format(np.mean([x[0]['val_loss'] for x in combined_results], axis=0)))
     mean_pred = np.squeeze(np.mean(np.stack([x[1] for x in combined_results]), axis=0))
     pd.DataFrame({'id': test_ids,
-                  'price_doc': mean_pred}).to_csv('data/dist_dense_output.csv',
+                  'price_doc': mean_pred}).to_csv('data/output/dist_dense_output.csv',
                                                   index=False)
 
     print('Elapsed time: {}'.format(time.time() - start_time))
