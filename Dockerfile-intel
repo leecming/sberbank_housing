@@ -6,7 +6,7 @@ RUN rm /etc/bash.bashrc
 
 WORKDIR /root
 
-RUN pip install sklearn pandas
+RUN pip install sklearn pandas xgboost lightgbm
 RUN apt-get update && apt-get install -y openssh-server screen
 RUN mkdir /var/run/sshd
 RUN echo 'root:testdocker' | chpasswd

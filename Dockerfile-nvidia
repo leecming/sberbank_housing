@@ -1,4 +1,4 @@
-FROM nvcr.io/nvidia/tensorflow:19.10-py3
+FROM nvcr.io/nvidia/tensorflow:19.11-tf1-py3
 ENV LANG C.UTF-8
 ENV LC_ALL C.UTF-8
 
@@ -6,6 +6,7 @@ RUN rm /etc/bash.bashrc
 
 WORKDIR /root
 
+RUN pip install xgboost lightgbm
 RUN apt-get update && apt-get install -y openssh-server screen
 RUN mkdir /var/run/sshd
 RUN echo 'root:testdocker' | chpasswd
