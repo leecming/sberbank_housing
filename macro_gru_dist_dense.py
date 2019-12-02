@@ -66,12 +66,12 @@ def train_fold(fold,
                train_rolling,
                test_rolling):
     train_idx, val_idx = fold
-    train_x_1 = train_df.iloc[train_idx].drop('price_doc', axis=1)
-    train_x_2 = train_rolling[train_idx]
+    train_x_1 = train_df.iloc[train_idx].drop('price_doc', axis=1).astype('float32')
+    train_x_2 = train_rolling[train_idx].astype('float32')
     train_y = train_labels[train_idx]
 
-    val_x_1 = train_df.iloc[val_idx].drop('price_doc', axis=1)
-    val_x_2 = train_rolling[val_idx]
+    val_x_1 = train_df.iloc[val_idx].drop('price_doc', axis=1).astype('float32')
+    val_x_2 = train_rolling[val_idx].astype('float32')
     val_y = train_labels[val_idx]
 
     std_scaler = StandardScaler().fit(train_x_1)
@@ -88,7 +88,8 @@ def train_fold(fold,
                         callbacks=[ExponentialMovingAverage()])
 
     test_df_1 = std_scaler.transform(test_df)
-    test_pred = np.expm1(np.dot(model.predict([test_df_1, test_rolling]),
+    test_pred = np.expm1(np.dot(model.predict([test_df_1.astype('float32'),
+                                               test_rolling.astype('float32')]),
                                 supports))
 
     return results.history, test_pred
@@ -152,7 +153,7 @@ if __name__ == '__main__':
     print('Val loss: {}'.format(np.mean([x[0]['val_loss'] for x in combined_results], axis=0)))
     mean_pred = np.squeeze(np.mean(np.stack([x[1] for x in combined_results]), axis=0))
     pd.DataFrame({'id': test_ids,
-                  'price_doc': mean_pred}).to_csv('data/output/macro_dist_dense_output.csv',
+                  'price_doc': mean_pred}).to_csv('data/output/macro_gru_dist_dense_output.csv',
                                                   index=False)
 
     print('Elapsed time: {}'.format(time.time() - start_time))
