@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
-TRAIN_PATH = 'data/pseudolabels.csv'
+TRAIN_PATH = 'data/train.csv'
 TEST_PATH = 'data/test.csv'
 MACRO_PATH = 'data/macro.csv'
 
