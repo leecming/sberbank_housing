@@ -4,6 +4,7 @@ on Sberbank Russian Housing Market dataset
 (https://www.kaggle.com/c/sberbank-russian-housing-market)
 - Uses MP to do parallel processing by folds
 """
+import time
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import KFold
@@ -36,6 +37,7 @@ def train_fold(fold, train_df, test_df):
 
 
 if __name__ == '__main__':
+    start_time = time.time()
     train_ids, test_ids, processed_train_df, processed_test_df = preprocess_csv(ohe_features=True,
                                                                                 ohe_card=20)
 
@@ -48,5 +50,6 @@ if __name__ == '__main__':
 
     mean_pred = np.squeeze(np.mean(np.stack([x for x in combined_results]), axis=0))
     pd.DataFrame({'id': test_ids,
-                  'price_doc': mean_pred}).to_csv('data/etr_regressor_output.csv',
+                  'price_doc': mean_pred}).to_csv('data/output/etr_regressor_output.csv',
                                                   index=False)
+    print('Elapsed time: {}'.format(time.time() - start_time))

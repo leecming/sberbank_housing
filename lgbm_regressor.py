@@ -1,16 +1,16 @@
 """
-Starter sklearn implementation of a Gradient Boosting regression model
+Starter lgbm implementation of a ExtraTrees regressor
 on Sberbank Russian Housing Market dataset
 (https://www.kaggle.com/c/sberbank-russian-housing-market)
-- Uses MP to do parallel processing by folds
+- Left the MP stubs but LGBM doesn't seem to play well with MP - running in sequence currently
 """
 import time
+from itertools import starmap
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import KFold
-from sklearn.ensemble import GradientBoostingRegressor
+from lightgbm import LGBMRegressor
 from preprocessors import preprocess_csv
-from multiprocessing import Pool
 
 SEED = 1337  # seed for kfold split
 NUM_FOLDS = 4  # kfold num splits
@@ -23,15 +23,16 @@ def split_to_folds(input_df):
 
 
 def train_fold(fold, train_df, test_df):
+    print('Here')
     train_idx, _ = fold
     train_x = train_df.iloc[train_idx].drop('price_doc', axis=1)
     train_y = train_df.iloc[train_idx]['price_doc']
 
-    gbr = GradientBoostingRegressor(n_estimators=300)
+    lgbmr = LGBMRegressor(n_estimators=300)
 
-    gbr.fit(train_x,
-            train_y)
-    test_pred = gbr.predict(test_df)
+    lgbmr.fit(train_x,
+              train_y)
+    test_pred = lgbmr.predict(test_df)
 
     return test_pred
 
@@ -43,14 +44,12 @@ if __name__ == '__main__':
 
     folds = split_to_folds(processed_train_df)
 
-    with Pool(NUM_FOLDS) as p:
-        combined_results = p.starmap(train_fold, ((curr_fold,
-                                                   processed_train_df,
-                                                   processed_test_df) for curr_fold in folds))
+    combined_results = starmap(train_fold, ((curr_fold,
+                                             processed_train_df,
+                                             processed_test_df) for curr_fold in folds))
 
     mean_pred = np.squeeze(np.mean(np.stack([x for x in combined_results]), axis=0))
     pd.DataFrame({'id': test_ids,
-                  'price_doc': mean_pred}).to_csv('data/output/gb_regressor_output.csv',
+                  'price_doc': mean_pred}).to_csv('data/output/lgbm_regressor_output.csv',
                                                   index=False)
-
     print('Elapsed time: {}'.format(time.time() - start_time))

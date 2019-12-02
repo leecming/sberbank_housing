@@ -4,6 +4,7 @@ that has a second input of a sliding window of macro data
 - uses BiGRU to interpret the macro sliding window data
 """
 import os
+import time
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import KFold
@@ -121,6 +122,7 @@ def generate_target_dist(mean, num_bins=NUM_BINS, low=LOW, high=HIGH):
 
 
 if __name__ == '__main__':
+    start_time = time.time()
     (train_ids,
      test_ids,
      processed_train_df,
@@ -150,5 +152,7 @@ if __name__ == '__main__':
     print('Val loss: {}'.format(np.mean([x[0]['val_loss'] for x in combined_results], axis=0)))
     mean_pred = np.squeeze(np.mean(np.stack([x[1] for x in combined_results]), axis=0))
     pd.DataFrame({'id': test_ids,
-                  'price_doc': mean_pred}).to_csv('data/macro_dist_dense_output.csv',
+                  'price_doc': mean_pred}).to_csv('data/output/macro_dist_dense_output.csv',
                                                   index=False)
+
+    print('Elapsed time: {}'.format(time.time() - start_time))

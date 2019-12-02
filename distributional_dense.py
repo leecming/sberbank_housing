@@ -6,6 +6,7 @@ https://arxiv.org/abs/1806.04613
   and with stdev = radius of bin
 """
 import os
+import time
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import KFold
@@ -110,6 +111,7 @@ def generate_target_dist(mean, num_bins=NUM_BINS, low=LOW, high=HIGH):
 
 
 if __name__ == '__main__':
+    start_time = time.time()
     train_ids, test_ids, processed_train_df, processed_test_df = preprocess_csv()
 
     # generate distribution labels
@@ -134,3 +136,5 @@ if __name__ == '__main__':
     pd.DataFrame({'id': test_ids,
                   'price_doc': mean_pred}).to_csv('data/dist_dense_output.csv',
                                                   index=False)
+
+    print('Elapsed time: {}'.format(time.time() - start_time))

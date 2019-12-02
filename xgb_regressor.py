@@ -1,5 +1,5 @@
 """
-Starter sklearn implementation of a Gradient Boosting regression model
+Starter xgboost implementation of a ExtraTrees regressor
 on Sberbank Russian Housing Market dataset
 (https://www.kaggle.com/c/sberbank-russian-housing-market)
 - Uses MP to do parallel processing by folds
@@ -8,7 +8,7 @@ import time
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import KFold
-from sklearn.ensemble import GradientBoostingRegressor
+from xgboost import XGBRegressor
 from preprocessors import preprocess_csv
 from multiprocessing import Pool
 
@@ -27,11 +27,11 @@ def train_fold(fold, train_df, test_df):
     train_x = train_df.iloc[train_idx].drop('price_doc', axis=1)
     train_y = train_df.iloc[train_idx]['price_doc']
 
-    gbr = GradientBoostingRegressor(n_estimators=300)
+    xgbr = XGBRegressor(n_estimators=300, objective='reg:squarederror')
 
-    gbr.fit(train_x,
-            train_y)
-    test_pred = gbr.predict(test_df)
+    xgbr.fit(train_x,
+             train_y)
+    test_pred = xgbr.predict(test_df)
 
     return test_pred
 
@@ -50,7 +50,6 @@ if __name__ == '__main__':
 
     mean_pred = np.squeeze(np.mean(np.stack([x for x in combined_results]), axis=0))
     pd.DataFrame({'id': test_ids,
-                  'price_doc': mean_pred}).to_csv('data/output/gb_regressor_output.csv',
+                  'price_doc': mean_pred}).to_csv('data/output/xgb_regressor_output.csv',
                                                   index=False)
-
     print('Elapsed time: {}'.format(time.time() - start_time))
