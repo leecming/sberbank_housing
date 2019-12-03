@@ -7,14 +7,17 @@ Modified version of basic_dense -
 5. parallel processing using mp where num_cores = num_folds
 """
 import os
+import time
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 from sklearn.model_selection import KFold
 from sklearn.preprocessing import StandardScaler
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras import layers
 from preprocessors import preprocess_csv
+from postprocessors import generate_stacking_inputs
 from keras_util import ExponentialMovingAverage
 from multiprocessing import Pool
 
@@ -22,7 +25,7 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 SEED = 1337  # seed for k-fold split
-NUM_FOLDS = 4  # k-fold num splits
+NUM_FOLDS = 8  # k-fold num splits
 BATCH_SIZE = 64
 NUM_EPOCHS = 100
 
@@ -55,11 +58,11 @@ def train_fold(fold, train_df, test_df):
     train_idx, val_idx = fold
     train_x = train_df.iloc[train_idx].drop('price_doc', axis=1)
     train_y = train_df.iloc[train_idx]['price_doc']
-    train_y = np.log1p(train_y)
+    train_y = np.log1p(train_y).values
 
     val_x = train_df.iloc[val_idx].drop('price_doc', axis=1)
     val_y = train_df.iloc[val_idx]['price_doc']
-    val_y = np.log1p(val_y)
+    val_y = np.log1p(val_y).values
 
     std_scaler = StandardScaler().fit(train_x)
     train_x = std_scaler.transform(train_x)
@@ -75,12 +78,15 @@ def train_fold(fold, train_df, test_df):
                         callbacks=[ExponentialMovingAverage()])
 
     test_df = std_scaler.transform(test_df)
-    test_pred = np.expm1(model.predict(test_df))
+    raw_val_prob = model.predict(val_x)
+    raw_test_prob = model.predict(test_df)
+    test_pred = np.expm1(raw_test_prob)
 
-    return results.history, test_pred
+    return results.history, test_pred, val_idx, raw_val_prob, raw_test_prob
 
 
 if __name__ == '__main__':
+    start_time = time.time()
     train_ids, test_ids, processed_train_df, processed_test_df = preprocess_csv()
 
     folds = split_to_folds(processed_train_df)
@@ -92,10 +98,27 @@ if __name__ == '__main__':
                                                    processed_train_df,
                                                    processed_test_df) for curr_fold in folds))
 
-    print('Loss: {}'.format(np.mean([x[0]['loss'] for x in combined_results], axis=0)))
-    print('Val loss: {}'.format(np.mean([x[0]['val_loss'] for x in combined_results], axis=0)))
-    print('Val RMSLE: {}'.format(np.sqrt(np.mean([x[0]['val_loss'] for x in combined_results], axis=0))))
+    losses = np.mean([x[0]['loss'] for x in combined_results], axis=0)
+    val_losses = np.mean([x[0]['val_loss'] for x in combined_results], axis=0)
+    print('Loss: {}'.format(losses))
+    print('Val loss: {}'.format(val_losses))
+    plt.plot(losses, label='train_losses')
+    plt.plot(val_losses, label='val_losses')
+    plt.title('Scaled Dense')
+    plt.legend(loc='best')
+    plt.show()
+
     mean_pred = np.squeeze(np.mean(np.stack([x[1] for x in combined_results]), axis=0))
     pd.DataFrame({'id': test_ids,
-                  'price_doc': mean_pred}).to_csv('data/scaled_dense_output.csv',
+                  'price_doc': mean_pred}).to_csv('data/output/scaled_dense_output.csv',
                                                   index=False)
+
+    generate_stacking_inputs(filename='scaled_dense_input',
+                             oof_indices=np.concatenate([x[2] for x in combined_results]),
+                             oof_preds=np.concatenate([x[3] for x in combined_results]),
+                             test_preds=np.squeeze(np.mean(np.stack([x[4] for x in combined_results]), axis=0)),
+                             train_ids=train_ids,
+                             test_ids=test_ids,
+                             train_df=processed_train_df)
+
+    print('Elapsed time: {}'.format(time.time() - start_time))
