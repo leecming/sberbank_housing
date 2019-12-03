@@ -23,4 +23,4 @@ COPY . .
 
 
 EXPOSE 22
-CMD ["bash", "-c", "/usr/sbin/sshd && tail -f /dev/null"]
+CMD ["bash", "-c", "/usr/sbin/sshd && jupyter notebook"]
