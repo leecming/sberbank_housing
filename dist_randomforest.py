@@ -98,7 +98,7 @@ if __name__ == '__main__':
                   'price_doc': mean_pred}).to_csv('data/output/rfr_dist_output.csv',
                                                   index=False)
 
-    generate_stacking_inputs(filename='rfr_input',
+    generate_stacking_inputs(filename='rfr_dist_input',
                              oof_indices=np.concatenate([x[1] for x in combined_results]),
                              oof_preds=np.concatenate([x[2] for x in combined_results]),
                              test_preds=np.squeeze(np.mean(np.stack([x[3] for x in combined_results]), axis=0)),
