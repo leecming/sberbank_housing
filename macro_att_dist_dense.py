@@ -16,6 +16,7 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.keras import layers
 from preprocessors import preprocess_csv
 from keras_util import ExponentialMovingAverage
+from postprocessors import generate_stacking_inputs
 from multiprocessing import Pool
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
@@ -95,11 +96,12 @@ def train_fold(fold,
                         callbacks=[ExponentialMovingAverage()])
 
     test_df_1 = std_scaler.transform(test_df)
-    test_pred = np.expm1(np.dot(model.predict([test_df_1.astype('float32'),
-                                               test_rolling.astype('float32')]),
-                                supports))
+    raw_val_prob = model.predict([val_x_1, val_x_2])
+    raw_test_prob = model.predict([test_df_1.astype('float32'),
+                                   test_rolling.astype('float32')])
+    test_pred = np.expm1(np.dot(raw_test_prob, supports))
 
-    return results.history, test_pred
+    return results.history, test_pred, val_idx, raw_val_prob, raw_test_prob
 
 
 def generate_target_dist(mean, num_bins=NUM_BINS, low=LOW, high=HIGH):
@@ -170,5 +172,13 @@ if __name__ == '__main__':
     pd.DataFrame({'id': test_ids,
                   'price_doc': mean_pred}).to_csv('data/output/macro_att_dist_dense_output.csv',
                                                   index=False)
+
+    generate_stacking_inputs(filename='macro_att_dist_dense_input',
+                             oof_indices=np.concatenate([x[2] for x in combined_results]),
+                             oof_preds=np.concatenate([x[3] for x in combined_results]),
+                             test_preds=np.squeeze(np.mean(np.stack([x[4] for x in combined_results]), axis=0)),
+                             train_ids=train_ids,
+                             test_ids=test_ids,
+                             train_df=processed_train_df)
 
     print('Elapsed time: {}'.format(time.time() - start_time))
