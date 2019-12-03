@@ -25,7 +25,7 @@ def generate_macro_windows(min_unique=100, lookback_period=100):
     returns a dates df (for matching), and their corresponding lookback data
     """
     macro_df = pd.read_csv(MACRO_PATH)
-    macro_df = macro_df.fillna(method='bfill').fillna(method='ffill')
+    macro_df = macro_df.fillna(method='ffill').fillna(method='bfill')
 
     unique_vals = macro_df.nunique()
     macro_df = macro_df[unique_vals[unique_vals >= min_unique].index.values]
