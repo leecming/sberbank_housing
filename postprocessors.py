@@ -68,13 +68,16 @@ def generate_stacking_inputs(filename,
     Given oof predictions and meaned-test predictions, write train and test stacking inputs
     - prediction columns are prefixed by filename
     """
+    price_df = pd.DataFrame({'id': train_ids[oof_indices],
+                  'price_doc': train_df.iloc[oof_indices]['price_doc']})
+
     oof_df = pd.DataFrame(oof_preds)
     output_columns = [filename + '_' + str(x) for x in oof_df.columns.values]
     oof_df.columns = output_columns
-    oof_df['id'] = train_ids[oof_indices]
-    oof_df['price_doc'] = train_df.iloc[oof_indices]['price_doc']
+    oof_df = oof_df.join(price_df)
     oof_df = oof_df[['id', 'price_doc'] + output_columns]
     oof_df.sort_values(by='id').to_csv('data/stacking_input/train/{}.csv'.format(filename), index=False)
+
     test_df = pd.DataFrame(test_preds)
     test_df.columns = [filename + '_' + str(x) for x in test_df.columns.values]
     test_df['id'] = test_ids
