@@ -2,3 +2,4 @@
 /data
 Pipfile
 Pipfile.lock
+/notebooks/.ipynb_checkpoints/
