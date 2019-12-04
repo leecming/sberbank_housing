@@ -7,20 +7,13 @@ on Sberbank Russian Housing Market dataset
 import time
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import KFold
 from sklearn.ensemble import GradientBoostingRegressor
-from preprocessors import preprocess_csv
+from preprocessors import preprocess_csv, split_to_folds
 from postprocessors import  generate_stacking_inputs
 from multiprocessing import Pool
 
 SEED = 1337  # seed for kfold split
 NUM_FOLDS = 4  # kfold num splits
-
-
-def split_to_folds(input_df):
-    """ Split input df into kfolds returning (train, val) index tuples """
-    kf = KFold(n_splits=NUM_FOLDS, random_state=SEED, shuffle=True)
-    return [x for x in kf.split(input_df)]
 
 
 def train_fold(fold, train_df, test_df):
@@ -44,7 +37,7 @@ if __name__ == '__main__':
     train_ids, test_ids, processed_train_df, processed_test_df = preprocess_csv(ohe_features=True,
                                                                                 ohe_card=20)
 
-    folds = split_to_folds(processed_train_df)
+    folds = split_to_folds(processed_train_df, NUM_FOLDS, SEED)
 
     with Pool(NUM_FOLDS) as p:
         combined_results = p.starmap(train_fold, ((curr_fold,

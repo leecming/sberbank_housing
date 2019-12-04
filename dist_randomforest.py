@@ -1,15 +1,13 @@
 """
 Apply multi-output Random Forest regression on the distributional targets
 """
-import os
 import time
+from functools import partial
 import pandas as pd
 import numpy as np
-from sklearn.model_selection import KFold
 from sklearn.ensemble import RandomForestRegressor
-from preprocessors import preprocess_csv
+from preprocessors import preprocess_csv, split_to_folds, generate_target_dist
 from postprocessors import generate_stacking_inputs
-from scipy.stats import truncnorm
 from multiprocessing import Pool
 
 
@@ -18,12 +16,6 @@ NUM_FOLDS = 4  # k-fold num splits
 LOW = 11  # lowest training price (log1p) = 11.51
 HIGH = 19  # highest training price = 18.53
 NUM_BINS = 10
-
-
-def split_to_folds(input_df):
-    """ Split input df into kfolds returning (train, val) index tuples """
-    kf = KFold(n_splits=NUM_FOLDS, random_state=SEED, shuffle=True)
-    return [x for x in kf.split(input_df)]
 
 
 def train_fold(fold, train_df, test_df, train_labels, supports):
@@ -46,43 +38,18 @@ def train_fold(fold, train_df, test_df, train_labels, supports):
     return test_pred, val_idx, raw_val_prob, raw_test_prob
 
 
-def generate_target_dist(mean, num_bins=NUM_BINS, low=LOW, high=HIGH):
-    """
-    Generate discretized truncated norm prob distribution centered around mean
-    :param mean: center of truncated norm
-    :param num_bins: number of bins
-    :param low: low end of truncated range
-    :param high: top end of truncated range
-    :return: (support, probabilities for support) tuple
-    """
-    radius = 0.5 * (high - low) / num_bins
-
-    def trunc_norm_prob(center):
-        """ get probability mass """
-        return (truncnorm.cdf(center + radius,
-                              a=(low - mean) / radius,
-                              b=(high - mean) / radius,
-                              loc=mean, scale=radius) -
-                truncnorm.cdf(center - radius,
-                              a=(low - mean) / radius,
-                              b=(high - mean) / radius,
-                              loc=mean, scale=radius))
-
-    supports = np.array([x * (2 * radius) + radius + low for x in range(num_bins)])
-    probs = np.array([trunc_norm_prob(support) for support in supports])
-    return supports, probs
-
-
 if __name__ == '__main__':
     start_time = time.time()
     train_ids, test_ids, processed_train_df, processed_test_df = preprocess_csv()
 
     # generate distribution labels
+    generate_target_partial = partial(generate_target_dist, num_bins=NUM_BINS, low=LOW, high=HIGH)
     with Pool(8) as p:
-        train_labels = np.stack([x[1] for x in p.map(generate_target_dist, np.log1p(processed_train_df['price_doc']))])
-    supports = generate_target_dist(-1)[0]
+        train_labels = np.stack([x[1] for x in p.map(generate_target_partial,
+                                                     np.log1p(processed_train_df['price_doc']))])
+    supports = generate_target_partial(-1)[0]
 
-    folds = split_to_folds(processed_train_df)
+    folds = split_to_folds(processed_train_df, NUM_FOLDS, SEED)
     all_fold_results = []
     all_fold_preds = []
 

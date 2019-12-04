@@ -11,12 +11,11 @@ import time
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from sklearn.model_selection import KFold
 from sklearn.preprocessing import StandardScaler
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras import layers
-from preprocessors import preprocess_csv
+from preprocessors import preprocess_csv, split_to_folds
 from postprocessors import generate_stacking_inputs
 from keras_util import ExponentialMovingAverage
 from multiprocessing import Pool
@@ -28,12 +27,6 @@ SEED = 1337  # seed for k-fold split
 NUM_FOLDS = 8  # k-fold num splits
 BATCH_SIZE = 64
 NUM_EPOCHS = 100
-
-
-def split_to_folds(input_df):
-    """ Split input df into kfolds returning (train, val) index tuples """
-    kf = KFold(n_splits=NUM_FOLDS, random_state=SEED, shuffle=True)
-    return [x for x in kf.split(input_df)]
 
 
 def build_dense_model():
@@ -89,7 +82,7 @@ if __name__ == '__main__':
     start_time = time.time()
     train_ids, test_ids, processed_train_df, processed_test_df = preprocess_csv()
 
-    folds = split_to_folds(processed_train_df)
+    folds = split_to_folds(processed_train_df, NUM_FOLDS, SEED)
     all_fold_results = []
     all_fold_preds = []
 

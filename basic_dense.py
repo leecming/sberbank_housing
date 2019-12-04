@@ -8,12 +8,11 @@ on Sberbank Russian Housing Market dataset
 """
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import KFold
 import tensorflow as tf
 from tensorflow.python.keras.models import Model
 from tensorflow.python.keras import layers
 from tensorflow.python.keras import backend as K
-from preprocessors import preprocess_csv
+from preprocessors import preprocess_csv, split_to_folds
 
 SEED = 1337  # seed for kfold split
 NUM_FOLDS = 4  # kfold num splits
@@ -24,12 +23,6 @@ NUM_EPOCHS = 5
 def rmsle(y_true, y_pred):
     """ RMS log-error """
     return K.sqrt(K.mean(K.square(tf.log1p(y_true) - tf.log1p(y_pred))))
-
-
-def split_to_folds(input_df):
-    """ Split input df into kfolds returning (train, val) index tuples """
-    kf = KFold(n_splits=NUM_FOLDS, random_state=SEED, shuffle=True)
-    return [x for x in kf.split(input_df)]
 
 
 def build_dense_model():
@@ -67,7 +60,7 @@ def train_fold(model, fold, train_df, test_df):
 if __name__ == '__main__':
     train_ids, test_ids, processed_train_df, processed_test_df = preprocess_csv()
 
-    folds = split_to_folds(processed_train_df)
+    folds = split_to_folds(processed_train_df, NUM_FOLDS, SEED)
     all_fold_results = []
     all_fold_preds = []
     for curr_fold in folds:
