@@ -99,7 +99,8 @@ def train_fold(fold,
 
 if __name__ == '__main__':
     start_time = time.time()
-    preprocess_dict = preprocess_csv(generate_rolling=True)
+    preprocess_dict = preprocess_csv(rolling_macro={'min_unique': 100,
+                                                    'lookback_period': 100})
     (train_ids,
      test_ids,
      processed_train_df,

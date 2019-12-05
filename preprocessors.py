@@ -52,6 +52,24 @@ def generate_macro_windows(min_unique=100, lookback_period=100):
     return rolling_dates, rolling_matrix
 
 
+def handle_ohe_columns(processed_df, ohe_features, ohe_card):
+    """ OHE non-numeric columns and numeric columns with low cardinality """
+    start_cols = list(processed_df.columns)
+    start_cols.remove('timestamp')
+    non_numeric_cols = []
+    for col in start_cols:
+        if processed_df[col].dtype not in [np.int, np.float] \
+                or (ohe_features and processed_df[col].nunique() <= ohe_card and col != 'is_train'):
+            if ohe_features:
+                oh_df = pd.get_dummies(processed_df[col])
+                oh_df.columns = [col + '_' + str(x) for x in oh_df.columns]
+                processed_df = pd.concat([processed_df, oh_df], axis=1)
+
+            non_numeric_cols.append(col)
+
+    return processed_df.drop(non_numeric_cols, axis=1)
+
+
 def generate_target_dist(mean, num_bins, low, high):
     """
     Generate discretized truncated norm prob distribution centered around mean
@@ -120,17 +138,16 @@ def remean_price_by_indicator(output_df, indicator):
 
 def preprocess_csv(ohe_features=False,
                    ohe_card=10,
-                   generate_rolling=False,
-                   min_unique=100,
-                   lookback_period=100,
-                   demean_by_indicator=False,
-                   demeaning_indicator='cpi'):
+                   rolling_macro=None,
+                   demeaning_indicator=None):
     """
     Transforms raw data in input CSVs into features ready for modelling
-    1. Drop id column
-    2. Timestamp col to year, month, day columns
-    3. Drop any non-numeric column
-    4, if ohe_features, ohe all non-numeric columns + numeric columns w/ distinct < ohe_card
+    1. If flagged, demean price targets by specified macro indicator
+    2. Drop id column
+    3. Timestamp col to year, month, day columns
+    4. Drop any non-numeric column & if ohe_features,
+        ohe all non-numeric columns + numeric columns w/ distinct < ohe_card
+    5. If flagged, generate rolling windows of macro data
     """
     train_df = pd.read_csv(TRAIN_PATH)
     test_df = pd.read_csv(TEST_PATH)
@@ -139,8 +156,8 @@ def preprocess_csv(ohe_features=False,
     train_df = train_df.fillna(-1, downcast='infer')
     train_df['is_train'] = 1
 
-    # demean by CPI
-    if demean_by_indicator:
+    # 1. Demean by Indicator
+    if demeaning_indicator:
         train_df = demean_by_macro_indicator(train_df, indicator=demeaning_indicator)
 
     test_df = test_df.fillna(-1, downcast='infer')
@@ -150,40 +167,27 @@ def preprocess_csv(ohe_features=False,
                                    ignore_index=True,
                                    sort=False)
 
-    # 1. Drop ID col
+    # 2. Drop ID col
     train_ids = processed_df[processed_df['is_train'] == 1]['id'].values
     test_ids = processed_df[processed_df['is_train'] == 0]['id'].values
     processed_df.drop(['id'], axis=1, inplace=True)
 
-    # 2. Split timestamp
+    # 3. Split timestamp
     ts_df = pd.DataFrame(processed_df['timestamp'].str.split('-', expand=True), dtype='int')
     processed_df[['ts_year', 'ts_month', 'ts_day']] = ts_df
     # processed_df.drop('timestamp', axis=1, inplace=True)
 
-    # 3. Drop non-numeric columns and if flag set, OH object columns
-    start_cols = list(processed_df.columns)
-    start_cols.remove('timestamp')
-    non_numeric_cols = []
-    for col in start_cols:
-        if processed_df[col].dtype not in [np.int, np.float] \
-                or (ohe_features and processed_df[col].nunique() <= ohe_card and col != 'is_train'):
-            if ohe_features:
-                oh_df = pd.get_dummies(processed_df[col])
-                oh_df.columns = [col + '_' + str(x) for x in oh_df.columns]
-                processed_df = pd.concat([processed_df, oh_df], axis=1)
-
-            non_numeric_cols.append(col)
-    processed_df.drop(non_numeric_cols, axis=1, inplace=True)
+    # 4. Drop non-numeric columns and if flag set, OH object columns
+    processed_df = handle_ohe_columns(processed_df, ohe_features, ohe_card)
 
     processed_train = processed_df[processed_df['is_train'] == 1].drop('is_train', axis=1)
     processed_test = processed_df[processed_df['is_train'] == 0].drop(['is_train', 'price_doc'],
                                                                       axis=1)
 
     train_rolling, test_rolling = None, None
-    # Generate lookback data
-    if generate_rolling:
-        rolling_dates, rolling_matrix = generate_macro_windows(min_unique=min_unique,
-                                                               lookback_period=lookback_period)
+    # 5. Generate lookback data
+    if rolling_macro:
+        rolling_dates, rolling_matrix = generate_macro_windows(**rolling_macro)
         train_rolling = rolling_matrix[
             processed_train.set_index('timestamp').join(rolling_dates.set_index('timestamp'))['rolling_id'].values]
         test_rolling = rolling_matrix[
