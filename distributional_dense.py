@@ -82,7 +82,14 @@ def train_fold(fold, train_df, test_df, train_labels, supports):
 
 if __name__ == '__main__':
     start_time = time.time()
-    train_ids, test_ids, processed_train_df, processed_test_df = preprocess_csv()
+    preprocess_dict = preprocess_csv()
+    (train_ids,
+     test_ids,
+     processed_train_df,
+     processed_test_df) = [preprocess_dict[key] for key in ['train_ids',
+                                                            'test_ids',
+                                                            'processed_train',
+                                                            'processed_test']]
 
     # generate distribution labels
     generate_target_partial = partial(generate_target_dist, num_bins=NUM_BINS, low=LOW, high=HIGH)

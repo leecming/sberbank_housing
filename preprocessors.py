@@ -179,6 +179,7 @@ def preprocess_csv(ohe_features=False,
     processed_test = processed_df[processed_df['is_train'] == 0].drop(['is_train', 'price_doc'],
                                                                       axis=1)
 
+    train_rolling, test_rolling = None, None
     # Generate lookback data
     if generate_rolling:
         rolling_dates, rolling_matrix = generate_macro_windows(min_unique=min_unique,
@@ -192,7 +193,9 @@ def preprocess_csv(ohe_features=False,
     processed_train.drop('timestamp', axis=1, inplace=True)
     processed_test.drop('timestamp', axis=1, inplace=True)
 
-    if generate_rolling:
-        return train_ids, test_ids, processed_train, processed_test, train_rolling, test_rolling
-    else:
-        return train_ids, test_ids, processed_train, processed_test
+    return {'train_ids': train_ids,
+            'test_ids': test_ids,
+            'processed_train': processed_train,
+            'processed_test': processed_test,
+            'train_rolling': train_rolling,
+            'test_rolling': test_rolling}

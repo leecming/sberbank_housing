@@ -22,7 +22,7 @@ NUM_EPOCHS = 5
 
 def rmsle(y_true, y_pred):
     """ RMS log-error """
-    return K.sqrt(K.mean(K.square(tf.log1p(y_true) - tf.log1p(y_pred))))
+    return K.sqrt(K.mean(K.square(tf.math.log1p(y_true) - tf.math.log1p(y_pred))))
 
 
 def build_dense_model():
@@ -58,7 +58,14 @@ def train_fold(model, fold, train_df, test_df):
 
 
 if __name__ == '__main__':
-    train_ids, test_ids, processed_train_df, processed_test_df = preprocess_csv()
+    preprocess_dict = preprocess_csv()
+    (train_ids,
+     test_ids,
+     processed_train_df,
+     processed_test_df) = [preprocess_dict[key] for key in ['train_ids',
+                                                            'test_ids',
+                                                            'processed_train',
+                                                            'processed_test']]
 
     folds = split_to_folds(processed_train_df, NUM_FOLDS, SEED)
     all_fold_results = []

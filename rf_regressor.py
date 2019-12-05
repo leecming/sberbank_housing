@@ -35,8 +35,15 @@ def train_fold(fold, train_df, test_df):
 
 if __name__ == '__main__':
     start_time = time.time()
-    train_ids, test_ids, processed_train_df, processed_test_df = preprocess_csv(ohe_features=True,
-                                                                                ohe_card=20)
+    preprocess_dict = preprocess_csv(ohe_features=True,
+                                     ohe_card=20)
+    (train_ids,
+     test_ids,
+     processed_train_df,
+     processed_test_df) = [preprocess_dict[key] for key in ['train_ids',
+                                                            'test_ids',
+                                                            'processed_train',
+                                                            'processed_test']]
 
     folds = split_to_folds(processed_train_df, NUM_FOLDS, SEED)
 
