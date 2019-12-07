@@ -8,6 +8,25 @@ from scipy.stats import truncnorm
 TRAIN_PATH = 'data/train.csv'
 TEST_PATH = 'data/test.csv'
 MACRO_PATH = 'data/macro.csv'
+# used to generate "days since" feature (2010-01-01 first date on macro.csv)
+DATE_START_POINT = pd.Timestamp('2010-01-01')
+
+
+def mixup_generator(train_features, train_labels, batch_size, alpha=0.2):
+    """ Generates linear mixes of train_features and targets with the proportion derived from the beta dist"""
+    assert len(train_features) == len(train_labels)
+
+    while True:
+        p = np.random.beta(alpha, alpha, size=(batch_size, 1))
+        indices_a = np.random.choice(list(range(len(train_features))), size=(batch_size,))
+        indices_b = np.random.choice(list(range(len(train_features))), size=(batch_size,))
+
+        combined_features = p * train_features[indices_a] + (1-p) * train_features[indices_b]
+
+        if train_labels.ndim == 1:
+            p = p.reshape(-1)
+        combined_targets = p * train_labels[indices_a] + (1-p) * train_labels[indices_b]
+        yield combined_features, combined_targets
 
 
 def split_to_folds(input_df, num_folds, seed=None):
@@ -24,6 +43,27 @@ def window_stack(a, step_size=1, width=3):
     """
     return np.stack((a[i:1 + i - width or None:step_size] for i in range(0, width)),
                     axis=1)
+
+
+def generate_simple_macro(input_df):
+    """ Pulls macro data to the input df by timestamp """
+    macro_df = pd.read_csv(MACRO_PATH)
+    macro_df = macro_df.iloc[:-1]  # last row garbage
+    macro_df = macro_df.fillna(method='ffill').fillna(method='bfill')
+    ts_df = pd.DataFrame(macro_df['timestamp'].str.split('-', expand=True), dtype='int')
+    numeric_cols = [col for col in macro_df.columns if macro_df[col].dtype in [np.float,
+                                                                               np.int]]
+    macro_df[['ts_year', 'ts_month', 'ts_day']] = ts_df
+    # macro_df['ts_days_since'] = (pd.to_datetime(macro_df['timestamp']) - DATE_START_POINT).dt.days
+    macro_df = macro_df.set_index('timestamp')[list(numeric_cols) +
+                                               ['ts_year', 'ts_month', 'ts_day']]
+
+    combined_df = input_df.set_index('timestamp').join(macro_df)
+    combined_df = combined_df[macro_df.columns]
+
+    combined_df = combined_df[['cpi', 'ppi', 'gdp_deflator', 'micex', 'mortgage_value']]
+
+    return combined_df
 
 
 def generate_macro_windows(min_unique=100, lookback_period=100):
@@ -55,7 +95,8 @@ def generate_macro_windows(min_unique=100, lookback_period=100):
 def handle_ohe_columns(processed_df, ohe_features, ohe_card):
     """ OHE non-numeric columns and numeric columns with low cardinality """
     start_cols = list(processed_df.columns)
-    start_cols.remove('timestamp')
+    # do not OHE datetime fields
+    [start_cols.remove(x) for x in ['timestamp', 'ts_year', 'ts_month', 'ts_day']]
     non_numeric_cols = []
     for col in start_cols:
         if processed_df[col].dtype not in [np.int, np.float] \
@@ -139,15 +180,17 @@ def remean_price_by_indicator(output_df, indicator):
 def preprocess_csv(ohe_features=False,
                    ohe_card=10,
                    rolling_macro=None,
-                   demeaning_indicator=None):
+                   demeaning_indicator=None,
+                   simple_macro=False):
     """
     Transforms raw data in input CSVs into features ready for modelling
     1. If flagged, demean price targets by specified macro indicator
     2. Drop id column
-    3. Timestamp col to year, month, day columns
-    4. Drop any non-numeric column & if ohe_features,
+    3.
+    4. Timestamp col to year, month, day columns
+    5. Drop any non-numeric column & if ohe_features,
         ohe all non-numeric columns + numeric columns w/ distinct < ohe_card
-    5. If flagged, generate rolling windows of macro data
+    6. If flagged, generate rolling windows of macro data
     """
     train_df = pd.read_csv(TRAIN_PATH)
     test_df = pd.read_csv(TEST_PATH)
@@ -172,12 +215,17 @@ def preprocess_csv(ohe_features=False,
     test_ids = processed_df[processed_df['is_train'] == 0]['id'].values
     processed_df.drop(['id'], axis=1, inplace=True)
 
-    # 3. Split timestamp
+    # 3. Generate macro data aligned with the processed train/test data on the timestamp
+    train_macro, test_macro = None, None
+    if simple_macro:
+        train_macro = generate_simple_macro(train_df)
+        test_macro = generate_simple_macro(test_df)
+
+    # 4. Split timestamp
     ts_df = pd.DataFrame(processed_df['timestamp'].str.split('-', expand=True), dtype='int')
     processed_df[['ts_year', 'ts_month', 'ts_day']] = ts_df
-    # processed_df.drop('timestamp', axis=1, inplace=True)
 
-    # 4. Drop non-numeric columns and if flag set, OH object columns
+    # 5. Drop non-numeric columns and if flag set, OH object columns
     processed_df = handle_ohe_columns(processed_df, ohe_features, ohe_card)
 
     processed_train = processed_df[processed_df['is_train'] == 1].drop('is_train', axis=1)
@@ -185,7 +233,7 @@ def preprocess_csv(ohe_features=False,
                                                                       axis=1)
 
     train_rolling, test_rolling = None, None
-    # 5. Generate lookback data
+    # 6. Generate lookback data
     if rolling_macro:
         rolling_dates, rolling_matrix = generate_macro_windows(**rolling_macro)
         train_rolling = rolling_matrix[
@@ -202,4 +250,17 @@ def preprocess_csv(ohe_features=False,
             'processed_train': processed_train,
             'processed_test': processed_test,
             'train_rolling': train_rolling,
-            'test_rolling': test_rolling}
+            'test_rolling': test_rolling,
+            'train_macro': train_macro,
+            'test_macro': test_macro}
+
+
+if __name__ == '__main__':
+    preprocess_dict = preprocess_csv()
+    test_gen = mixup_generator(preprocess_dict['processed_train'].values,
+                               preprocess_dict['train_ids'],
+                               alpha=0.2,
+                               batch_size=64)
+    a, b = next(test_gen)
+    print(a.shape)
+    print(b.shape)
