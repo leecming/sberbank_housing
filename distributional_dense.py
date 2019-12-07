@@ -6,6 +6,7 @@ https://arxiv.org/abs/1806.04613
   and with stdev = radius of bin
 """
 import os
+import math
 import time
 from functools import partial
 import pandas as pd
@@ -17,7 +18,7 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.keras import layers
 from preprocessors import preprocess_csv
 from keras_util import ExponentialMovingAverage
-from preprocessors import split_to_folds, generate_target_dist
+from preprocessors import split_to_folds, generate_target_dist, mixup_generator
 from postprocessors import generate_stacking_inputs
 from multiprocessing import Pool
 
@@ -31,6 +32,7 @@ NUM_EPOCHS = 30
 LOW = 11  # lowest training price (log1p) = 11.51
 HIGH = 19  # highest training price = 18.53
 NUM_BINS = 10
+MIX_UP = False
 
 
 def build_dense_model():
@@ -51,7 +53,12 @@ def build_dense_model():
     return model
 
 
-def train_fold(fold, train_df, test_df, train_labels, supports):
+def train_fold(fold,
+               train_df,
+               test_df,
+               train_labels,
+               supports,
+               mix_up=False):
     train_idx, val_idx = fold
     train_x = train_df.iloc[train_idx].drop('price_doc', axis=1)
     train_y = train_labels[train_idx]
@@ -64,13 +71,23 @@ def train_fold(fold, train_df, test_df, train_labels, supports):
     val_x = std_scaler.transform(val_x)
 
     model = build_dense_model()
-    results = model.fit(x=train_x,
-                        y=train_y,
-                        batch_size=BATCH_SIZE,
-                        validation_data=(val_x, val_y),
-                        epochs=NUM_EPOCHS,
-                        verbose=0,
-                        callbacks=[ExponentialMovingAverage()])
+
+    if mix_up:
+        results = model.fit_generator(generator=mixup_generator(train_x, train_y, batch_size=BATCH_SIZE, alpha=0.2),
+                                      validation_data=(val_x, val_y),
+                                      steps_per_epoch=math.ceil(len(train_x) / BATCH_SIZE),
+                                      epochs=NUM_EPOCHS,
+                                      verbose=0,
+                                      callbacks=[ExponentialMovingAverage()])
+    else:
+        results = model.fit(x=train_x,
+                            y=train_y,
+                            batch_size=BATCH_SIZE,
+                            validation_data=(val_x, val_y),
+                            epochs=NUM_EPOCHS,
+                            verbose=0,
+                            callbacks=[ExponentialMovingAverage()])
+
 
     test_df = std_scaler.transform(test_df)
     raw_val_prob = model.predict(val_x)
@@ -107,7 +124,8 @@ if __name__ == '__main__':
                                                    processed_train_df,
                                                    processed_test_df,
                                                    train_labels,
-                                                   supports) for curr_fold in folds))
+                                                   supports,
+                                                   MIX_UP) for curr_fold in folds))
 
     losses = np.mean([x[0]['loss'] for x in combined_results], axis=0)
     val_losses = np.mean([x[0]['val_loss'] for x in combined_results], axis=0)
@@ -119,12 +137,13 @@ if __name__ == '__main__':
     plt.legend(loc='best')
     plt.show()
 
+    output_name = 'dist_dense_mixup' if MIX_UP else 'dist_dense'
     mean_pred = np.squeeze(np.mean(np.stack([x[1] for x in combined_results]), axis=0))
     pd.DataFrame({'id': test_ids,
-                  'price_doc': mean_pred}).to_csv('data/output/dist_dense_output.csv',
+                  'price_doc': mean_pred}).to_csv('data/output/{}.csv'.format(output_name),
                                                   index=False)
 
-    generate_stacking_inputs(filename='dist_dense_input',
+    generate_stacking_inputs(filename=output_name,
                              oof_indices=np.concatenate([x[2] for x in combined_results]),
                              oof_preds=np.concatenate([x[3] for x in combined_results]),
                              test_preds=np.squeeze(np.mean(np.stack([x[4] for x in combined_results]), axis=0)),
