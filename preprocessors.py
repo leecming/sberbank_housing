@@ -21,11 +21,11 @@ def mixup_generator(train_features, train_labels, batch_size, alpha=0.2):
         indices_a = np.random.choice(list(range(len(train_features))), size=(batch_size,))
         indices_b = np.random.choice(list(range(len(train_features))), size=(batch_size,))
 
-        combined_features = p * train_features[indices_a] + (1-p) * train_features[indices_b]
+        combined_features = p * train_features[indices_a] + (1 - p) * train_features[indices_b]
 
         if train_labels.ndim == 1:
             p = p.reshape(-1)
-        combined_targets = p * train_labels[indices_a] + (1-p) * train_labels[indices_b]
+        combined_targets = p * train_labels[indices_a] + (1 - p) * train_labels[indices_b]
         yield combined_features, combined_targets
 
 
@@ -54,14 +54,18 @@ def generate_simple_macro(input_df):
     numeric_cols = [col for col in macro_df.columns if macro_df[col].dtype in [np.float,
                                                                                np.int]]
     macro_df[['ts_year', 'ts_month', 'ts_day']] = ts_df
-    # macro_df['ts_days_since'] = (pd.to_datetime(macro_df['timestamp']) - DATE_START_POINT).dt.days
     macro_df = macro_df.set_index('timestamp')[list(numeric_cols) +
                                                ['ts_year', 'ts_month', 'ts_day']]
 
     combined_df = input_df.set_index('timestamp').join(macro_df)
     combined_df = combined_df[macro_df.columns]
 
-    combined_df = combined_df[['cpi', 'ppi', 'gdp_deflator', 'micex', 'mortgage_value']]
+    # downcast DP to SP
+    for col in combined_df.columns:
+        if combined_df[col].dtype == np.float64:
+            combined_df[col] = combined_df[col].astype(np.float32)
+        elif combined_df[col].dtype == np.int64:
+            combined_df[col] = combined_df[col].astype(np.int32)
 
     return combined_df
 
@@ -232,6 +236,13 @@ def preprocess_csv(ohe_features=False,
     # 5. Drop non-numeric columns and if flag set, OH object columns
     processed_df = handle_ohe_columns(processed_df, ohe_features, ohe_card)
 
+    # reduce memory usage by downcasting all DP values to SP
+    for col in processed_df.columns:
+        if processed_df[col].dtype == np.float64:
+            processed_df[col] = processed_df[col].astype(np.float32)
+        elif processed_df[col].dtype == np.int64:
+            processed_df[col] = processed_df[col].astype(np.int32)
+
     processed_train = processed_df[processed_df['is_train'] == 1].drop('is_train', axis=1)
     processed_test = processed_df[processed_df['is_train'] == 0].drop(['is_train', 'price_doc'],
                                                                       axis=1)
@@ -246,9 +257,11 @@ def preprocess_csv(ohe_features=False,
 
         rolling_dates, rolling_matrix = generate_macro_windows(**rolling_macro)
         train_rolling = rolling_matrix[
-            processed_train.set_index('timestamp').join(rolling_dates.set_index('timestamp'))['rolling_id'].values]
+            processed_train.set_index('timestamp').join(rolling_dates.set_index('timestamp'))[
+                'rolling_id'].values].astype(np.float32)
         test_rolling = rolling_matrix[
-            processed_test.set_index('timestamp').join(rolling_dates.set_index('timestamp'))['rolling_id'].values]
+            processed_test.set_index('timestamp').join(rolling_dates.set_index('timestamp'))[
+                'rolling_id'].values].astype(np.float32)
 
     # Drop timestamp column after generating lookups
     # Be careful:- they've been converted to last day of month
@@ -266,8 +279,17 @@ def preprocess_csv(ohe_features=False,
 
 
 if __name__ == '__main__':
-    preprocess_dict = preprocess_csv(rolling_macro={'min_unique': 10,
-                                                    'lookback_period': 12,
-                                                    'monthly_resampling': True})
-    train_df = preprocess_dict['processed_train']
-    print(train_df.sample(n=10))
+    preprocess_dict = preprocess_csv(ohe_features=True)
+    (train_ids,
+     test_ids,
+     processed_train_df,
+     processed_test_df) = [preprocess_dict[key] for key in ['train_ids',
+                                                            'test_ids',
+                                                            'processed_train',
+                                                            'processed_test']]
+
+    numerator = processed_train_df.sample(n=1000000, replace=True).values
+    denominator = processed_train_df.sample(n=1000000, replace=True).values
+    output_df = pd.DataFrame((numerator / denominator), columns=processed_train_df.columns).astype(np.float32)
+    print(output_df.info())
+    print(output_df.sample(n=10))
