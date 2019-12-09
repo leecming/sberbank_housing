@@ -87,7 +87,7 @@ def generate_macro_windows(min_unique=100, lookback_period=100, monthly_resampli
         macro_df[[x for x in macro_df.columns if x != 'timestamp']])
 
     rolling_matrix = window_stack(macro_df, width=lookback_period)
-    rolling_dates = pd.DataFrame(rolling_matrix[:, -6, 0]).reset_index()
+    rolling_dates = pd.DataFrame(rolling_matrix[:, -1, 0]).reset_index()
     rolling_dates.columns = ['rolling_id', 'timestamp']
 
     # drop dates from matrix
@@ -269,10 +269,5 @@ if __name__ == '__main__':
     preprocess_dict = preprocess_csv(rolling_macro={'min_unique': 10,
                                                     'lookback_period': 12,
                                                     'monthly_resampling': True})
-    # print(preprocess_dict['processed_train'].iloc[-20])
-    print(preprocess_dict['train_rolling'].shape)
-
-
-    # dates, sliding_windows = generate_macro_windows(1, 12, monthly_resampling=True)
-    # print(dates.iloc[0])
-    # print(sliding_windows[0, -2, :])
+    train_df = preprocess_dict['processed_train']
+    print(train_df.sample(n=10))
