@@ -66,24 +66,28 @@ def generate_simple_macro(input_df):
     return combined_df
 
 
-def generate_macro_windows(min_unique=100, lookback_period=100):
+def generate_macro_windows(min_unique=100, lookback_period=100, monthly_resampling=False):
     """
     Converts raw macro csv into stacked matrix over the lookback period
     and for macro columns that have >= min_unique values
     returns a dates df (for matching), and their corresponding lookback data
     """
-    macro_df = pd.read_csv(MACRO_PATH)
+    macro_df = pd.read_csv(MACRO_PATH).iloc[:-1]
     macro_df = macro_df.fillna(method='ffill').fillna(method='bfill')
+
+    if monthly_resampling:
+        macro_df['timestamp'] = pd.to_datetime(macro_df['timestamp'])
+        macro_df = macro_df.set_index('timestamp').resample('M').mean().reset_index()
 
     unique_vals = macro_df.nunique()
     macro_df = macro_df[unique_vals[unique_vals >= min_unique].index.values]
-    macro_df = macro_df.iloc[:-1]  # last row garbage
+
     # Normalize all columns except for timestamp
     macro_df[[x for x in macro_df.columns if x != 'timestamp']] = StandardScaler().fit_transform(
         macro_df[[x for x in macro_df.columns if x != 'timestamp']])
 
     rolling_matrix = window_stack(macro_df, width=lookback_period)
-    rolling_dates = pd.DataFrame(rolling_matrix[:, -1, 0]).reset_index()
+    rolling_dates = pd.DataFrame(rolling_matrix[:, -6, 0]).reset_index()
     rolling_dates.columns = ['rolling_id', 'timestamp']
 
     # drop dates from matrix
@@ -235,6 +239,11 @@ def preprocess_csv(ohe_features=False,
     train_rolling, test_rolling = None, None
     # 6. Generate lookback data
     if rolling_macro:
+        # Convert all dates to end-of-month to allow for join with the macro data
+        if 'monthly_resampling' in rolling_macro:
+            processed_train['timestamp'] = pd.to_datetime(processed_train['timestamp']) + pd.offsets.MonthEnd(0)
+            processed_test['timestamp'] = pd.to_datetime(processed_test['timestamp']) + pd.offsets.MonthEnd(0)
+
         rolling_dates, rolling_matrix = generate_macro_windows(**rolling_macro)
         train_rolling = rolling_matrix[
             processed_train.set_index('timestamp').join(rolling_dates.set_index('timestamp'))['rolling_id'].values]
@@ -242,6 +251,7 @@ def preprocess_csv(ohe_features=False,
             processed_test.set_index('timestamp').join(rolling_dates.set_index('timestamp'))['rolling_id'].values]
 
     # Drop timestamp column after generating lookups
+    # Be careful:- they've been converted to last day of month
     processed_train.drop('timestamp', axis=1, inplace=True)
     processed_test.drop('timestamp', axis=1, inplace=True)
 
@@ -256,11 +266,13 @@ def preprocess_csv(ohe_features=False,
 
 
 if __name__ == '__main__':
-    preprocess_dict = preprocess_csv()
-    test_gen = mixup_generator(preprocess_dict['processed_train'].values,
-                               preprocess_dict['train_ids'],
-                               alpha=0.2,
-                               batch_size=64)
-    a, b = next(test_gen)
-    print(a.shape)
-    print(b.shape)
+    preprocess_dict = preprocess_csv(rolling_macro={'min_unique': 10,
+                                                    'lookback_period': 12,
+                                                    'monthly_resampling': True})
+    # print(preprocess_dict['processed_train'].iloc[-20])
+    print(preprocess_dict['train_rolling'].shape)
+
+
+    # dates, sliding_windows = generate_macro_windows(1, 12, monthly_resampling=True)
+    # print(dates.iloc[0])
+    # print(sliding_windows[0, -2, :])
