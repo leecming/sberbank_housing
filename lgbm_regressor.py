@@ -26,7 +26,8 @@ def train_fold(fold, train_df, test_df):
     lgbmr = LGBMRegressor(n_estimators=1000,
                           boosting_type='dart',
                           max_bin=1024,
-                          num_leaves=127)
+                          num_leaves=127,
+                          n_jobs=20)  # restrict to subset of avail cores
 
     lgbmr.fit(train_x,
               train_y)
