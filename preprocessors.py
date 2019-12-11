@@ -2,7 +2,7 @@
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import KFold
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, LabelEncoder
 from scipy.stats import truncnorm
 
 TRAIN_PATH = 'data/train.csv'
@@ -100,23 +100,31 @@ def generate_macro_windows(min_unique=100, lookback_period=100, monthly_resampli
     return rolling_dates, rolling_matrix
 
 
-def handle_ohe_columns(processed_df, ohe_features, ohe_card):
-    """ OHE non-numeric columns and numeric columns with low cardinality """
+def handle_nonnumeric_columns(processed_df):
+    """ Label encode non-numeric columns """
+    # manually encode Ecology column
+    processed_df['ecology'] = processed_df['ecology'].map({'no data': 1,
+                                                           'poor': 2,
+                                                           'satisfactory': 3,
+                                                           'good': 4,
+                                                           'excellent': 5})
+
+    processed_df['product_type'] = processed_df['product_type'].map({-1: 1,
+                                                                     'Investment': 0,
+                                                                     'OwnerOccupier': 2})
+
     start_cols = list(processed_df.columns)
-    # do not OHE datetime fields
-    [start_cols.remove(x) for x in ['timestamp', 'ts_year', 'ts_month', 'ts_day']]
-    non_numeric_cols = []
+    # do not encode datetime fields
+    [start_cols.remove(x) for x in ['timestamp',
+                                    'ts_year',
+                                    'ts_month',
+                                    'ts_day',
+                                    'is_train']]
     for col in start_cols:
-        if processed_df[col].dtype not in [np.int, np.float] \
-                or (ohe_features and processed_df[col].nunique() <= ohe_card and col != 'is_train'):
-            if ohe_features:
-                oh_df = pd.get_dummies(processed_df[col])
-                oh_df.columns = [col + '_' + str(x) for x in oh_df.columns]
-                processed_df = pd.concat([processed_df, oh_df], axis=1)
+        if processed_df[col].dtype not in [np.int, np.float]:
+            processed_df[col] = LabelEncoder().fit_transform(processed_df[col])
 
-            non_numeric_cols.append(col)
-
-    return processed_df.drop(non_numeric_cols, axis=1)
+    return processed_df
 
 
 def generate_target_dist(mean, num_bins, low, high):
@@ -185,19 +193,16 @@ def remean_price_by_indicator(output_df, indicator):
     return output_df.reset_index(drop=True).drop(indicator, axis=1)
 
 
-def preprocess_csv(ohe_features=False,
-                   ohe_card=10,
-                   rolling_macro=None,
+def preprocess_csv(rolling_macro=None,
                    demeaning_indicator=None,
                    simple_macro=False):
     """
     Transforms raw data in input CSVs into features ready for modelling
     1. If flagged, demean price targets by specified macro indicator
-    2. Drop id column
-    3.
+    2. Drop id and sub_area columns
+    3. Generate macro data
     4. Timestamp col to year, month, day columns
-    5. Drop any non-numeric column & if ohe_features,
-        ohe all non-numeric columns + numeric columns w/ distinct < ohe_card
+    5. Label encode the binary object columns
     6. If flagged, generate rolling windows of macro data
     """
     train_df = pd.read_csv(TRAIN_PATH)
@@ -218,10 +223,10 @@ def preprocess_csv(ohe_features=False,
                                    ignore_index=True,
                                    sort=False)
 
-    # 2. Drop ID col
+    # 2. Drop ID and sub_area cols
     train_ids = processed_df[processed_df['is_train'] == 1]['id'].values
     test_ids = processed_df[processed_df['is_train'] == 0]['id'].values
-    processed_df.drop(['id'], axis=1, inplace=True)
+    processed_df.drop(['id', 'sub_area'], axis=1, inplace=True)
 
     # 3. Generate macro data aligned with the processed train/test data on the timestamp
     train_macro, test_macro = None, None
@@ -233,8 +238,8 @@ def preprocess_csv(ohe_features=False,
     ts_df = pd.DataFrame(processed_df['timestamp'].str.split('-', expand=True), dtype='int')
     processed_df[['ts_year', 'ts_month', 'ts_day']] = ts_df
 
-    # 5. Drop non-numeric columns and if flag set, OH object columns
-    processed_df = handle_ohe_columns(processed_df, ohe_features, ohe_card)
+    # 5. Label Encode binary columns
+    processed_df = handle_nonnumeric_columns(processed_df)
 
     # reduce memory usage by downcasting all DP values to SP
     for col in processed_df.columns:
@@ -290,10 +295,3 @@ if __name__ == '__main__':
     test_folds = split_to_folds(processed_train_df, 8, 1337, shuffle=True)
 
     print(processed_train_df)
-
-    print(test_folds[0][0])
-    print(test_folds[0][1])
-
-    print(test_folds[1][0])
-    print(test_folds[1][1])
-
