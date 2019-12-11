@@ -198,6 +198,7 @@ def preprocess_csv(rolling_macro=None,
                    simple_macro=False):
     """
     Transforms raw data in input CSVs into features ready for modelling
+    0. Read and transmit list of cols. that are tied to sub_area
     1. If flagged, demean price targets by specified macro indicator
     2. Drop id and sub_area columns
     3. Generate macro data
@@ -211,6 +212,13 @@ def preprocess_csv(rolling_macro=None,
     # infer arg needed otherwise int columns get casted as float
     train_df = train_df.fillna(-1, downcast='infer')
     train_df['is_train'] = 1
+
+    # 0. Get sub_area columns
+    sub_area_df = train_df.groupby('sub_area').nunique()
+    sub_area_df = (sub_area_df == 1).all()
+    sub_area_cols = sorted(sub_area_df[sub_area_df].index.values)
+    # remove is_train and sub_area as both not relevant
+    [sub_area_cols.remove(col) for col in ['is_train', 'sub_area']]
 
     # 1. Demean by Indicator
     if demeaning_indicator:
@@ -280,7 +288,8 @@ def preprocess_csv(rolling_macro=None,
             'train_rolling': train_rolling,
             'test_rolling': test_rolling,
             'train_macro': train_macro,
-            'test_macro': test_macro}
+            'test_macro': test_macro,
+            'sub_area_cols': sub_area_cols}
 
 
 if __name__ == '__main__':
@@ -288,10 +297,11 @@ if __name__ == '__main__':
     (train_ids,
      test_ids,
      processed_train_df,
-     processed_test_df) = [preprocess_dict[key] for key in ['train_ids',
-                                                            'test_ids',
-                                                            'processed_train',
-                                                            'processed_test']]
-    test_folds = split_to_folds(processed_train_df, 8, 1337, shuffle=True)
+     processed_test_df,
+     sub_area_cols) = [preprocess_dict[key] for key in ['train_ids',
+                                                        'test_ids',
+                                                        'processed_train',
+                                                        'processed_test',
+                                                        'sub_area_cols']]
 
-    print(processed_train_df)
+    print(sub_area_cols)
