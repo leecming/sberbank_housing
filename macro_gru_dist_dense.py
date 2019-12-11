@@ -32,7 +32,7 @@ NUM_BINS = 10
 
 def build_dense_model():
     """ Simple two layer MLP """
-    inputs_1 = layers.Input(shape=(277,))
+    inputs_1 = layers.Input(shape=(291,))
     output_1 = layers.GaussianDropout(0.1)(inputs_1)
 
     inputs_2 = layers.Input(shape=(None, 7))

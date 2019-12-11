@@ -37,7 +37,7 @@ MIX_UP = False
 
 def build_dense_model():
     """ Simple two layer MLP """
-    inputs = layers.Input(shape=(277,))
+    inputs = layers.Input(shape=(291,))
     output = layers.GaussianDropout(0.1)(inputs)
     output = layers.Dense(64, activation='relu')(output)
     output = layers.BatchNormalization()(output)

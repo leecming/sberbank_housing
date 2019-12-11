@@ -34,8 +34,7 @@ def train_fold(fold, train_df, test_df):
 
 if __name__ == '__main__':
     start_time = time.time()
-    preprocess_dict = preprocess_csv(ohe_features=True,
-                                     ohe_card=20)
+    preprocess_dict = preprocess_csv()
     (train_ids,
      test_ids,
      processed_train_df,
