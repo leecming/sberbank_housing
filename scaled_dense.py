@@ -89,7 +89,10 @@ if __name__ == '__main__':
                                                             'processed_train',
                                                             'processed_test']]
 
-    folds = split_to_folds(processed_train_df, NUM_FOLDS, SEED)
+    folds = split_to_folds(processed_train_df,
+                           num_folds=NUM_FOLDS,
+                           seed=SEED,
+                           shuffle=False)
     all_fold_results = []
     all_fold_preds = []
 

@@ -22,7 +22,7 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 SEED = 1337  # seed for k-fold split
-NUM_FOLDS = 8  # k-fold num splits
+NUM_FOLDS = 4  # k-fold num splits
 BATCH_SIZE = 64
 NUM_EPOCHS = 30
 LOW = 11  # lowest training price (log1p) = 11.51
@@ -113,7 +113,10 @@ if __name__ == '__main__':
                                                      np.log1p(processed_train_df['price_doc']))])
     supports = generate_target_partial(-1)[0]
 
-    folds = split_to_folds(processed_train_df, NUM_FOLDS, SEED)
+    folds = split_to_folds(processed_train_df,
+                           num_folds=NUM_FOLDS,
+                           seed=SEED,
+                           shuffle=False)
     all_fold_results = []
     all_fold_preds = []
 

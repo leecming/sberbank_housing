@@ -44,7 +44,10 @@ if __name__ == '__main__':
                                                             'processed_train',
                                                             'processed_test']]
 
-    folds = split_to_folds(processed_train_df, NUM_FOLDS, SEED)
+    folds = split_to_folds(processed_train_df,
+                           num_folds=NUM_FOLDS,
+                           seed=SEED,
+                           shuffle=False)
 
     with Pool(NUM_FOLDS) as p:
         combined_results = p.starmap(train_fold, ((curr_fold,

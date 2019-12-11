@@ -57,7 +57,10 @@ if __name__ == '__main__':
                                                      np.log1p(processed_train_df['price_doc']))])
     supports = generate_target_partial(-1)[0]
 
-    folds = split_to_folds(processed_train_df, NUM_FOLDS, SEED)
+    folds = split_to_folds(processed_train_df,
+                           num_folds=NUM_FOLDS,
+                           seed=SEED,
+                           shuffle=False)
     all_fold_results = []
     all_fold_preds = []
 

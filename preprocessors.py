@@ -29,9 +29,9 @@ def mixup_generator(train_features, train_labels, batch_size, alpha=0.2):
         yield combined_features, combined_targets
 
 
-def split_to_folds(input_df, num_folds, seed=None):
+def split_to_folds(input_df, num_folds, seed=None, shuffle=True):
     """ Split input df into kfolds returning (train, val) index tuples """
-    kf = KFold(n_splits=num_folds, random_state=seed, shuffle=True)
+    kf = KFold(n_splits=num_folds, random_state=seed, shuffle=shuffle)
     return [x for x in kf.split(input_df)]
 
 
@@ -279,7 +279,7 @@ def preprocess_csv(ohe_features=False,
 
 
 if __name__ == '__main__':
-    preprocess_dict = preprocess_csv(ohe_features=True)
+    preprocess_dict = preprocess_csv()
     (train_ids,
      test_ids,
      processed_train_df,
@@ -287,9 +287,13 @@ if __name__ == '__main__':
                                                             'test_ids',
                                                             'processed_train',
                                                             'processed_test']]
+    test_folds = split_to_folds(processed_train_df, 8, 1337, shuffle=True)
 
-    numerator = processed_train_df.sample(n=1000000, replace=True).values
-    denominator = processed_train_df.sample(n=1000000, replace=True).values
-    output_df = pd.DataFrame((numerator / denominator), columns=processed_train_df.columns).astype(np.float32)
-    print(output_df.info())
-    print(output_df.sample(n=10))
+    print(processed_train_df)
+
+    print(test_folds[0][0])
+    print(test_folds[0][1])
+
+    print(test_folds[1][0])
+    print(test_folds[1][1])
+
