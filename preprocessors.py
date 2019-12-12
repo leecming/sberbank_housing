@@ -205,7 +205,8 @@ def preprocess_csv(rolling_macro=None,
     4. Timestamp col to year, month, day columns
     5. Label encode the binary object columns
     6. Add monthly count column
-    7. If flagged, generate rolling windows of macro data
+    7. Add monthly median columns (for test price_doc, set to -1)
+    8. If flagged, generate rolling windows of macro data
     """
     train_df = pd.read_csv(TRAIN_PATH)
     test_df = pd.read_csv(TEST_PATH)
@@ -262,12 +263,18 @@ def preprocess_csv(rolling_macro=None,
     monthly_counts.name = 'monthly_counts'
     processed_df = processed_df.set_index(['ts_year', 'ts_month']).join(monthly_counts).reset_index()
 
+    # 7. Add monthly median columns (-1 for test price doc)
+    median_df = processed_df.groupby(['ts_year', 'ts_month']).median()
+    median_df.drop('is_train', axis=1, inplace=True)
+    median_df.columns = ['median_' + str(col) for col in median_df.columns]
+    processed_df = processed_df.set_index(['ts_year', 'ts_month']).join(median_df).reset_index()
+    processed_df.loc[(processed_df['is_train'] == 0), 'median_price_doc'] = -1
+
     processed_train = processed_df[processed_df['is_train'] == 1].drop('is_train', axis=1)
     processed_test = processed_df[processed_df['is_train'] == 0].drop(['is_train', 'price_doc'],
                                                                       axis=1)
-
     train_rolling, test_rolling = None, None
-    # 7. Generate lookback data
+    # 8. Generate lookback data
     if rolling_macro:
         # Convert all dates to end-of-month to allow for join with the macro data
         if 'monthly_resampling' in rolling_macro:
@@ -308,4 +315,4 @@ if __name__ == '__main__':
                                                             'processed_train',
                                                             'processed_test']]
 
-    print(processed_train_df.monthly_counts.max())
+    print(processed_test_df['median_price_doc'])
