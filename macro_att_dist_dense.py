@@ -30,12 +30,13 @@ HIGH = 19  # highest training price = 18.53
 NUM_BINS = 10
 
 
-def build_dense_model():
+def build_dense_model(num_features_1,
+                      num_features_2):
     """ Simple two layer MLP """
-    inputs_1 = layers.Input(shape=(291,))
+    inputs_1 = layers.Input(shape=(num_features_1,))
     output_1 = layers.GaussianDropout(0.1)(inputs_1)
 
-    inputs_2 = layers.Input(shape=(None, 7))
+    inputs_2 = layers.Input(shape=(None, num_features_2))
     output_2 = layers.Conv1D(filters=5,
                              kernel_size=4,
                              padding='same',
@@ -79,7 +80,8 @@ def train_fold(fold,
     train_x_1 = std_scaler.transform(train_x_1)
     val_x_1 = std_scaler.transform(val_x_1)
 
-    model = build_dense_model()
+    model = build_dense_model(num_features_1=train_x_1.shape[-1],
+                              num_features_2=train_x_2.shape[-1])
     results = model.fit(x=[train_x_1, train_x_2],
                         y=train_y,
                         batch_size=BATCH_SIZE,

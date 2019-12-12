@@ -29,9 +29,9 @@ BATCH_SIZE = 64
 NUM_EPOCHS = 100
 
 
-def build_dense_model():
+def build_dense_model(num_features):
     """ Simple two layer MLP """
-    inputs = layers.Input(shape=(291,))
+    inputs = layers.Input(shape=(num_features,))
     output = layers.GaussianDropout(0.1)(inputs)
     output = layers.Dense(64, activation='relu')(output)
     output = layers.BatchNormalization()(output)
@@ -61,7 +61,7 @@ def train_fold(fold, train_df, test_df):
     train_x = std_scaler.transform(train_x)
     val_x = std_scaler.transform(val_x)
 
-    model = build_dense_model()
+    model = build_dense_model(num_features=train_x.shape[-1])
     results = model.fit(x=train_x,
                         y=train_y,
                         batch_size=BATCH_SIZE,

@@ -25,9 +25,9 @@ def rmsle(y_true, y_pred):
     return K.sqrt(K.mean(K.square(tf.math.log1p(y_true) - tf.math.log1p(y_pred))))
 
 
-def build_dense_model():
+def build_dense_model(num_features):
     """ Simple two layer MLP """
-    inputs = layers.Input(shape=(277,))
+    inputs = layers.Input(shape=(num_features,))
     output = layers.Dense(64, activation='relu')(inputs)
     output = layers.Dense(1)(output)
     model = Model(inputs=inputs,
@@ -71,7 +71,7 @@ if __name__ == '__main__':
     all_fold_results = []
     all_fold_preds = []
     for curr_fold in folds:
-        _, curr_results, curr_pred = train_fold(build_dense_model(),
+        _, curr_results, curr_pred = train_fold(build_dense_model(num_features=processed_train_df.shape[1]-1),
                                                 curr_fold,
                                                 processed_train_df,
                                                 processed_test_df)

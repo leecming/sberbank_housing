@@ -204,7 +204,8 @@ def preprocess_csv(rolling_macro=None,
     3. Generate macro data
     4. Timestamp col to year, month, day columns
     5. Label encode the binary object columns
-    6. If flagged, generate rolling windows of macro data
+    6. Add monthly count column
+    7. If flagged, generate rolling windows of macro data
     """
     train_df = pd.read_csv(TRAIN_PATH)
     test_df = pd.read_csv(TEST_PATH)
@@ -256,12 +257,17 @@ def preprocess_csv(rolling_macro=None,
         elif processed_df[col].dtype == np.int64:
             processed_df[col] = processed_df[col].astype(np.int32)
 
+    # 6. Add monthly count column
+    monthly_counts = processed_df.groupby(['ts_year', 'ts_month']).size()
+    monthly_counts.name = 'monthly_counts'
+    processed_df = processed_df.set_index(['ts_year', 'ts_month']).join(monthly_counts).reset_index()
+
     processed_train = processed_df[processed_df['is_train'] == 1].drop('is_train', axis=1)
     processed_test = processed_df[processed_df['is_train'] == 0].drop(['is_train', 'price_doc'],
                                                                       axis=1)
 
     train_rolling, test_rolling = None, None
-    # 6. Generate lookback data
+    # 7. Generate lookback data
     if rolling_macro:
         # Convert all dates to end-of-month to allow for join with the macro data
         if 'monthly_resampling' in rolling_macro:
@@ -297,11 +303,9 @@ if __name__ == '__main__':
     (train_ids,
      test_ids,
      processed_train_df,
-     processed_test_df,
-     sub_area_cols) = [preprocess_dict[key] for key in ['train_ids',
-                                                        'test_ids',
-                                                        'processed_train',
-                                                        'processed_test',
-                                                        'sub_area_cols']]
+     processed_test_df) = [preprocess_dict[key] for key in ['train_ids',
+                                                            'test_ids',
+                                                            'processed_train',
+                                                            'processed_test']]
 
-    print(sub_area_cols)
+    print(processed_train_df.monthly_counts.max())

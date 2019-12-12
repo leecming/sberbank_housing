@@ -35,9 +35,9 @@ NUM_BINS = 10
 MIX_UP = False
 
 
-def build_dense_model():
+def build_dense_model(num_features):
     """ Simple two layer MLP """
-    inputs = layers.Input(shape=(291,))
+    inputs = layers.Input(shape=(num_features,))
     output = layers.GaussianDropout(0.1)(inputs)
     output = layers.Dense(64, activation='relu')(output)
     output = layers.BatchNormalization()(output)
@@ -70,7 +70,7 @@ def train_fold(fold,
     train_x = std_scaler.transform(train_x)
     val_x = std_scaler.transform(val_x)
 
-    model = build_dense_model()
+    model = build_dense_model(num_features=train_x.shape[1])
 
     if mix_up:
         results = model.fit_generator(generator=mixup_generator(train_x, train_y, batch_size=BATCH_SIZE, alpha=0.2),
