@@ -7,7 +7,8 @@ on Sberbank Russian Housing Market dataset
 import time
 import numpy as np
 import pandas as pd
-from xgboost import XGBRegressor
+import matplotlib.pyplot as plt
+from xgboost import XGBRegressor, plot_importance
 from preprocessors import preprocess_csv, split_to_folds
 from postprocessors import generate_stacking_inputs
 from multiprocessing import Pool
@@ -28,6 +29,9 @@ def train_fold(fold, train_df, test_df):
                         objective='reg:squarederror')
 
     xgbr.fit(train_x, train_y)
+    plot_importance(xgbr, max_num_features=30)
+    plt.show()
+
     val_pred = xgbr.predict(val_x)
     test_pred = xgbr.predict(test_df)
 

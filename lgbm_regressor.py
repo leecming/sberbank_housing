@@ -6,9 +6,10 @@ on Sberbank Russian Housing Market dataset
 """
 import time
 from itertools import starmap
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from lightgbm import LGBMRegressor
+from lightgbm import LGBMRegressor, plot_importance
 from preprocessors import preprocess_csv, split_to_folds
 from postprocessors import generate_stacking_inputs
 
@@ -31,6 +32,10 @@ def train_fold(fold, train_df, test_df):
 
     lgbmr.fit(train_x,
               train_y)
+
+    plot_importance(lgbmr, max_num_features=20)
+    plt.show()
+
     val_pred = lgbmr.predict(val_x)
     test_pred = lgbmr.predict(test_df)
 
