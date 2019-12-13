@@ -68,6 +68,9 @@ def train_fold(fold,
                train_rolling,
                test_rolling):
     train_idx, val_idx = fold
+    train_df.drop([col for col in train_df.columns if 'median_' in col], axis=1, inplace=True)
+    test_df.drop([col for col in test_df.columns if 'median_' in col], axis=1, inplace=True)
+
     train_x_1 = train_df.iloc[train_idx].drop('price_doc', axis=1).astype('float32')
     train_x_2 = train_rolling[train_idx].astype('float32')
     train_y = train_labels[train_idx]
