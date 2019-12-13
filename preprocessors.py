@@ -263,6 +263,13 @@ def preprocess_csv(rolling_macro=None,
     monthly_counts.name = 'monthly_counts'
     processed_df = processed_df.set_index(['ts_year', 'ts_month']).join(monthly_counts).reset_index()
 
+    processed_df['build_age'] = processed_df['ts_year'] - processed_df['build_year']
+    processed_df.loc[(processed_df['ts_year'] == -1) | (processed_df['build_year'] == -1), 'build_age'] = -1
+    processed_df['floor_ratio'] = (processed_df['floor'] / processed_df['max_floor']).clip(lower=0., upper=1.).fillna(0)
+    processed_df.loc[(processed_df['floor'] == -1) | (processed_df['max_floor'] == -1), 'floor_ratio'] = -1
+    processed_df['life_ratio'] = (processed_df['life_sq'] / processed_df['full_sq']).clip(lower=0., upper=1.).fillna(0)
+    processed_df.loc[(processed_df['life_sq'] == -1) | (processed_df['full_sq'] == -1), 'life_ratio'] = -1
+
     # 7. Add monthly median columns (-1 for test price doc)
     median_df = processed_df.groupby(['ts_year', 'ts_month']).median()
     median_df.drop('is_train', axis=1, inplace=True)
@@ -315,4 +322,7 @@ if __name__ == '__main__':
                                                             'processed_train',
                                                             'processed_test']]
 
-    print(processed_test_df['median_price_doc'])
+    print(processed_train_df[processed_train_df.isna().any(axis=1)])
+    print(processed_test_df[processed_test_df.isna().any(axis=1)])
+    # null_columns = processed_test_df.columns[processed_test_df.isnull().any()]
+    # print(null_columns)
