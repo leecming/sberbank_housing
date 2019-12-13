@@ -86,4 +86,4 @@ def generate_stacking_inputs(filename,
 
 
 if __name__ == '__main__':
-    combine_stacking_inputs()
+    ensemble_csvs()
