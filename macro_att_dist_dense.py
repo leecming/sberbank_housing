@@ -22,7 +22,7 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 SEED = 1337  # seed for k-fold split
-NUM_FOLDS = 4  # k-fold num splits
+NUM_FOLDS = 8  # k-fold num splits
 BATCH_SIZE = 64
 NUM_EPOCHS = 30
 LOW = 11  # lowest training price (log1p) = 11.51
@@ -73,10 +73,12 @@ def train_fold(fold,
 
     train_x_1 = train_df.iloc[train_idx].drop('price_doc', axis=1).astype('float32')
     train_x_2 = train_rolling[train_idx].astype('float32')
+    train_x_2 = np.diff(train_x_2, axis=1)
     train_y = train_labels[train_idx]
 
     val_x_1 = train_df.iloc[val_idx].drop('price_doc', axis=1).astype('float32')
     val_x_2 = train_rolling[val_idx].astype('float32')
+    val_x_2 = np.diff(val_x_2, axis=1)
     val_y = train_labels[val_idx]
 
     std_scaler = StandardScaler().fit(train_x_1)
@@ -95,6 +97,7 @@ def train_fold(fold,
 
     test_df_1 = std_scaler.transform(test_df)
     raw_val_prob = model.predict([val_x_1, val_x_2])
+    test_rolling = np.diff(test_rolling, axis=1)
     raw_test_prob = model.predict([test_df_1.astype('float32'),
                                    test_rolling.astype('float32')])
     test_pred = np.expm1(np.dot(raw_test_prob, supports))
