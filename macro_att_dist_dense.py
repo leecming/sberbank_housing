@@ -43,6 +43,7 @@ def build_dense_model(num_features_1,
                              activation='relu')(inputs_2)
     output_2 = layers.Attention()([output_2, output_2])
     output_2 = layers.GlobalMaxPooling1D()(output_2)
+    output_2 = layers.Dropout(0.1)(output_2)
 
     output = layers.concatenate([output_1, output_2])
     output = layers.Dense(64, activation='relu')(output)
@@ -107,8 +108,9 @@ def train_fold(fold,
 
 if __name__ == '__main__':
     start_time = time.time()
-    preprocess_dict = preprocess_csv(rolling_macro={'min_unique': 100,
-                                                    'lookback_period': 100})
+    preprocess_dict = preprocess_csv(rolling_macro={'min_unique': 20,
+                                                    'lookback_period': 12,
+                                                    'monthly_resampling': True})
     (train_ids,
      test_ids,
      processed_train_df,

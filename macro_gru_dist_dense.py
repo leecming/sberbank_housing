@@ -22,7 +22,7 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 SEED = 1337  # seed for k-fold split
-NUM_FOLDS = 4  # k-fold num splits
+NUM_FOLDS = 8  # k-fold num splits
 BATCH_SIZE = 64
 NUM_EPOCHS = 30
 LOW = 11  # lowest training price (log1p) = 11.51
@@ -62,12 +62,16 @@ def train_fold(fold,
                train_rolling,
                test_rolling):
     train_idx, val_idx = fold
+    train_df.drop([col for col in train_df.columns if 'median_' in col], axis=1, inplace=True)
+    test_df.drop([col for col in test_df.columns if 'median_' in col], axis=1, inplace=True)
     train_x_1 = train_df.iloc[train_idx].drop('price_doc', axis=1).astype('float32')
     train_x_2 = train_rolling[train_idx].astype('float32')
+    train_x_2 = np.diff(train_x_2, axis=1)
     train_y = train_labels[train_idx]
 
     val_x_1 = train_df.iloc[val_idx].drop('price_doc', axis=1).astype('float32')
     val_x_2 = train_rolling[val_idx].astype('float32')
+    val_x_2 = np.diff(val_x_2, axis=1)
     val_y = train_labels[val_idx]
 
     std_scaler = StandardScaler().fit(train_x_1)
@@ -86,6 +90,7 @@ def train_fold(fold,
 
     test_df_1 = std_scaler.transform(test_df)
     raw_val_prob = model.predict([val_x_1, val_x_2])
+    test_rolling = np.diff(test_rolling, axis=1)
     raw_test_prob = model.predict([test_df_1.astype('float32'),
                                    test_rolling.astype('float32')])
     test_pred = np.expm1(np.dot(raw_test_prob, supports))
@@ -95,8 +100,9 @@ def train_fold(fold,
 
 if __name__ == '__main__':
     start_time = time.time()
-    preprocess_dict = preprocess_csv(rolling_macro={'min_unique': 100,
-                                                    'lookback_period': 100})
+    preprocess_dict = preprocess_csv(rolling_macro={'min_unique': 20,
+                                                    'lookback_period': 12,
+                                                    'monthly_resampling': True})
     (train_ids,
      test_ids,
      processed_train_df,
@@ -108,7 +114,7 @@ if __name__ == '__main__':
                                                        'processed_test',
                                                        'train_rolling',
                                                        'test_rolling']]
-    # generate distribution labels
+
     generate_target_partial = partial(generate_target_dist, num_bins=NUM_BINS, low=LOW, high=HIGH)
     with Pool(8) as p:
         train_labels = np.stack([x[1] for x in p.map(generate_target_partial,
