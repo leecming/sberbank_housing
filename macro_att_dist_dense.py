@@ -99,8 +99,11 @@ def train_fold(fold,
     test_df_1 = std_scaler.transform(test_df)
     raw_val_prob = model.predict([val_x_1, val_x_2])
     test_rolling = np.diff(test_rolling, axis=1)
-    raw_test_prob = model.predict([test_df_1.astype('float32'),
-                                   test_rolling.astype('float32')])
+    agg_test_prob = []
+    for _ in range(8):
+        agg_test_prob.append(model.predict([test_df_1.astype('float32') * np.random.normal(1., scale=(0.1/0.9), size=test_df_1.shape),
+                                            test_rolling.astype('float32') * np.random.normal(1., scale=(0.1/0.9), size=test_rolling.shape)]))
+    raw_test_prob = np.mean(np.stack(agg_test_prob, axis=0), axis=0)
     test_pred = np.expm1(np.dot(raw_test_prob, supports))
 
     return results.history, test_pred, val_idx, raw_val_prob, raw_test_prob
