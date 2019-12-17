@@ -51,9 +51,10 @@ def build_dense_model(num_features_1,
     output = layers.Dropout(0.1)(output)
     output = layers.Dense(64, activation='relu')(output)
     output = layers.BatchNormalization()(output)
-    output = layers.Dense(NUM_BINS, activation='softmax')(output)
+    output_actual = layers.Dense(NUM_BINS, activation='softmax')(output)
+    output_median = layers.Dense(NUM_BINS, activation='softmax')(output)
     model = Model(inputs=[inputs_1, inputs_2],
-                  outputs=output)
+                  outputs=[output_actual, output_median])
 
     model.compile(optimizer=Adam(),
                   loss='categorical_crossentropy')
@@ -75,12 +76,12 @@ def train_fold(fold,
     train_x_1 = train_df.iloc[train_idx].drop('price_doc', axis=1).astype('float32')
     train_x_2 = train_rolling[train_idx].astype('float32')
     train_x_2 = np.diff(train_x_2, axis=1)
-    train_y = train_labels[train_idx]
+    train_y = [train_labels[0][train_idx], train_labels[1][train_idx]]
 
     val_x_1 = train_df.iloc[val_idx].drop('price_doc', axis=1).astype('float32')
     val_x_2 = train_rolling[val_idx].astype('float32')
     val_x_2 = np.diff(val_x_2, axis=1)
-    val_y = train_labels[val_idx]
+    val_y = [train_labels[0][val_idx], train_labels[1][val_idx]]
 
     std_scaler = StandardScaler().fit(train_x_1)
     train_x_1 = std_scaler.transform(train_x_1)
@@ -97,12 +98,14 @@ def train_fold(fold,
                         callbacks=[ExponentialMovingAverage()])
 
     test_df_1 = std_scaler.transform(test_df)
-    raw_val_prob = model.predict([val_x_1, val_x_2])
+    raw_val_prob = model.predict([val_x_1, val_x_2])[0]
     test_rolling = np.diff(test_rolling, axis=1)
     agg_test_prob = []
     for _ in range(8):
-        agg_test_prob.append(model.predict([test_df_1.astype('float32') * np.random.normal(1., scale=(0.1/0.9), size=test_df_1.shape),
-                                            test_rolling.astype('float32') * np.random.normal(1., scale=(0.1/0.9), size=test_rolling.shape)]))
+        agg_test_prob.append(
+            model.predict([test_df_1.astype('float32') * np.random.normal(1., scale=(0.1 / 0.9), size=test_df_1.shape),
+                           test_rolling.astype('float32') * np.random.normal(1., scale=(0.1 / 0.9),
+                                                                             size=test_rolling.shape)])[0])
     raw_test_prob = np.mean(np.stack(agg_test_prob, axis=0), axis=0)
     test_pred = np.expm1(np.dot(raw_test_prob, supports))
 
@@ -114,6 +117,7 @@ if __name__ == '__main__':
     preprocess_dict = preprocess_csv(rolling_macro={'min_unique': 20,
                                                     'lookback_period': 12,
                                                     'monthly_resampling': True})
+
     (train_ids,
      test_ids,
      processed_train_df,
@@ -129,9 +133,12 @@ if __name__ == '__main__':
     # generate distribution labels
     generate_target_partial = partial(generate_target_dist, num_bins=NUM_BINS, low=LOW, high=HIGH)
     with Pool(8) as p:
-        train_labels = np.stack([x[1] for x in p.map(generate_target_partial,
-                                                     np.log1p(processed_train_df['price_doc']))])
+        train_labels_actual = np.stack([x[1] for x in p.map(generate_target_partial,
+                                                            np.log1p(processed_train_df['price_doc']))])
+        train_labels_median = np.stack([x[1] for x in p.map(generate_target_partial,
+                                                            np.log1p(processed_train_df['median_price_doc']))])
     supports = generate_target_partial(-1)[0]
+    train_labels = [train_labels_actual, train_labels_median]
 
     folds = split_to_folds(processed_train_df,
                            num_folds=NUM_FOLDS,
