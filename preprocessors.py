@@ -270,6 +270,11 @@ def preprocess_csv(rolling_macro=None,
     processed_df['life_ratio'] = (processed_df['life_sq'] / processed_df['full_sq']).clip(lower=0., upper=1.).fillna(0)
     processed_df.loc[(processed_df['life_sq'] == -1) | (processed_df['full_sq'] == -1), 'life_ratio'] = -1
 
+    processed_df.loc[(processed_df['life_sq'] <= 0), 'life_sq'] = 1
+    processed_df.loc[(processed_df['full_sq'] <= 0), 'full_sq'] = 1
+    processed_df.loc[(processed_df['floor'] <= 0), 'floor'] = 1
+    processed_df.loc[(processed_df['num_room'] <= 0), 'num_room'] = 1
+
     # 7. Add monthly median columns (-1 for test price doc)
     median_df = processed_df.groupby(['ts_year', 'ts_month']).median()
     median_df.drop('is_train', axis=1, inplace=True)
@@ -322,7 +327,8 @@ if __name__ == '__main__':
                                                             'processed_train',
                                                             'processed_test']]
 
-    print(processed_train_df[processed_train_df.isna().any(axis=1)])
-    print(processed_test_df[processed_test_df.isna().any(axis=1)])
+    psm = processed_train_df['price_doc'] / processed_train_df['full_sq']
+    print(np.log1p(psm.max()))
+    print(np.log1p(psm.min()))
     # null_columns = processed_test_df.columns[processed_test_df.isnull().any()]
     # print(null_columns)
