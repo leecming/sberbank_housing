@@ -49,6 +49,9 @@ def build_dense_model(num_features):
 
 def train_fold(fold, train_df, test_df):
     train_idx, val_idx = fold
+    train_df.drop([col for col in train_df.columns if 'median_' in col], axis=1, inplace=True)
+    test_df.drop([col for col in test_df.columns if 'median_' in col], axis=1, inplace=True)
+
     train_x = train_df.iloc[train_idx].drop('price_doc', axis=1)
     train_y = train_df.iloc[train_idx]['price_doc']
     train_y = np.log1p(train_y).values
