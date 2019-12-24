@@ -22,24 +22,24 @@ def train_fold(fold, train_df, test_df):
     train_x = train_df.iloc[train_idx].drop('price_doc', axis=1)
     train_y = train_df.iloc[train_idx]['price_doc']
 
-    val_x = train_df.iloc[val_idx].drop('price_doc', axis=1)
+    all_preds = []
+    for curr_divisor in [None, 'full_sq']:
+        lgbm = LGBMRegressor(n_estimators=1000,
+                             boosting_type='dart',
+                             max_bin=1024,
+                             num_leaves=127,
+                             n_jobs=20)
+        if curr_divisor:
+            lgbm.fit(train_x, train_y / train_df.iloc[train_idx][curr_divisor])
+            all_preds.append(lgbm.predict(test_df) * test_df[curr_divisor])
+        else:
+            lgbm.fit(train_x, train_y)
+            all_preds.append(lgbm.predict(test_df))
 
-    lgbmr = LGBMRegressor(n_estimators=1000,
-                          boosting_type='dart',
-                          max_bin=1024,
-                          num_leaves=127,
-                          n_jobs=20)  # restrict to subset of avail cores
+    stacked_pred = np.stack(all_preds, axis=0)
+    test_pred = np.nanmean(np.where(stacked_pred > 0, stacked_pred, np.nan), axis=0)
 
-    lgbmr.fit(train_x,
-              train_y)
-
-    plot_importance(lgbmr, max_num_features=20)
-    plt.show()
-
-    val_pred = lgbmr.predict(val_x)
-    test_pred = lgbmr.predict(test_df)
-
-    return test_pred, val_idx, val_pred
+    return test_pred, val_idx, None
 
 
 if __name__ == '__main__':
@@ -67,12 +67,12 @@ if __name__ == '__main__':
                   'price_doc': mean_pred}).to_csv('data/output/lgbm_regressor_output.csv',
                                                   index=False)
 
-    generate_stacking_inputs(filename='lgbm_regressor',
-                             oof_indices=np.concatenate([x[1] for x in combined_results]),
-                             oof_preds=np.concatenate([x[2] for x in combined_results]),
-                             test_preds=mean_pred,
-                             train_ids=train_ids,
-                             test_ids=test_ids,
-                             train_df=processed_train_df)
+    # generate_stacking_inputs(filename='lgbm_regressor',
+    #                          oof_indices=np.concatenate([x[1] for x in combined_results]),
+    #                          oof_preds=np.concatenate([x[2] for x in combined_results]),
+    #                          test_preds=mean_pred,
+    #                          train_ids=train_ids,
+    #                          test_ids=test_ids,
+    #                          train_df=processed_train_df)
 
     print('Elapsed time: {}'.format(time.time() - start_time))
